@@ -1,0 +1,7 @@
+# Development and CI: runtime + test and lint tooling.
+-r base.txt
+pytest>=8.3,<9
+pytest-django>=4.9,<5
+factory_boy>=3.3,<4
+ruff>=0.6,<1
+django-debug-toolbar>=4.4,<7

@@ -1,0 +1,29 @@
+[project]
+name = "truck-parts-data-center"
+version = "0.1.0"
+description = "AI product data center MVP for a truck parts export company"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["**/migrations/*", "docs", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Layered settings deliberately star-import base.
+"config/settings/*.py" = ["F403", "F405"]
+# Diagram generator is dense coordinate data and long Chinese captions;
+# only layout-style rules are relaxed, correctness rules (F) still apply.
+"scripts/gen_diagrams.py" = ["E501", "E701", "E702", "E731"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "config"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+testpaths = ["apps"]
+python_files = ["test_*.py", "tests.py"]
+addopts = "--strict-markers"

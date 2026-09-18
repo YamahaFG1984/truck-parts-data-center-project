@@ -1,0 +1,53 @@
+{% load static %}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}卡车配件 AI 产品数据中心{% endblock %}</title>
+  {# Tailwind play CDN is fine for a demo; not for production builds. #}
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+  <script src="{% static 'vendor/alpine.min.js' %}" defer></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800 flex flex-col"
+      hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  <header class="bg-white border-b border-slate-200">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+      <a href="{% url 'core:home' %}" class="font-bold text-slate-900">卡车配件 AI 产品数据中心</a>
+      {% if user.is_authenticated %}
+      <nav class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+        {# Links for features built in later milestones; they 404 until then. #}
+        <a class="hover:text-blue-700" href="{% url 'core:home' %}">首页</a>
+        <a class="hover:text-blue-700" href="/search/">搜索</a>
+        <a class="hover:text-blue-700" href="/import/">导入</a>
+        <a class="hover:text-blue-700" href="/quality/">看板</a>
+        <a class="hover:text-blue-700" href="/ai/review/">审核</a>
+        <a class="hover:text-blue-700" href="/inquiry/">询价</a>
+        {% if user.is_staff %}<a class="hover:text-blue-700" href="{% url 'admin:index' %}">后台</a>{% endif %}
+      </nav>
+      <form method="post" action="{% url 'logout' %}" class="ml-auto text-sm">
+        {% csrf_token %}
+        <span class="text-slate-500">{{ user.get_username }}</span>
+        <button type="submit" class="ml-2 text-blue-700 hover:underline">退出</button>
+      </form>
+      {% endif %}
+    </div>
+  </header>
+
+  <main class="flex-1 w-full max-w-6xl mx-auto px-4 py-6">
+    {% if messages %}
+    <ul class="mb-4 space-y-2">
+      {% for message in messages %}
+      <li class="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm">{{ message }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-slate-200 text-xs text-slate-500">
+    <div class="max-w-6xl mx-auto px-4 py-3">演示数据均为合成，编号不代表真实 OE 号。</div>
+  </footer>
+</body>
+</html>

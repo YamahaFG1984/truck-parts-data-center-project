@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}登录 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<div class="max-w-sm mx-auto mt-10 bg-white border border-slate-200 rounded-lg p-6">
+  <h1 class="text-xl font-bold mb-4">登录</h1>
+  <form method="post" class="space-y-4">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="text-sm text-red-700">{{ form.non_field_errors }}</div>
+    {% endif %}
+    <label class="block text-sm">
+      <span class="text-slate-600">用户名</span>
+      <input type="text" name="username" autofocus required
+             class="mt-1 w-full rounded border border-slate-300 px-3 py-2">
+    </label>
+    <label class="block text-sm">
+      <span class="text-slate-600">密码</span>
+      <input type="password" name="password" required
+             class="mt-1 w-full rounded border border-slate-300 px-3 py-2">
+    </label>
+    <input type="hidden" name="next" value="{{ next }}">
+    <button type="submit" class="w-full rounded bg-blue-700 text-white py-2 hover:bg-blue-800">登录</button>
+  </form>
+</div>
+{% endblock %}
