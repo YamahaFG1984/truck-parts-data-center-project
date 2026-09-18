@@ -5,6 +5,7 @@ from .base import Q_CLUSTER
 
 DEBUG = False
 LLM_PROVIDER = "mock"
+LLM_MOCK_LATENCY_SECONDS = 0
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 
 # Serve static files straight from app/static dirs; no collectstatic needed.

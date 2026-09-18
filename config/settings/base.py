@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.catalog",
     "apps.suppliers",
     "apps.importer",
+    "apps.ai",
 ]
 
 MIDDLEWARE = [
@@ -132,6 +133,8 @@ LLM_VISION_BASE_URL = env("LLM_VISION_BASE_URL", default="") or LLM_BASE_URL
 LLM_VISION_API_KEY = env("LLM_VISION_API_KEY", default="") or LLM_API_KEY
 LLM_VISION_MODEL = env("LLM_VISION_MODEL", default="mock")
 LLM_TIMEOUT_SECONDS = env.int("LLM_TIMEOUT_SECONDS", default=60)
+# Simulated delay of the offline mock so the demo feels like a real call.
+LLM_MOCK_LATENCY_SECONDS = env.float("LLM_MOCK_LATENCY_SECONDS", default=0.3)
 
 # --- Business -----------------------------------------------------------------
 

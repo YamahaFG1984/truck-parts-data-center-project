@@ -1,0 +1,15 @@
+{
+  "_note": "Mock output. Generic enough to read sensibly for any brake part.",
+  "title_en": "Brake Pad Set Front Axle for Volvo FH12 FH16 Trucks, OE 20443906",
+  "description_en": "Heavy-duty brake pad set for the front axle of Volvo FH12 and FH16 trucks. Manufactured to OE dimensions with a semi-metallic friction compound for stable braking under load and long service life. Each set is inspected before shipment and packed in a color box with an export carton. Please confirm the OE number or send a photo of the old part before ordering to make sure it fits.",
+  "keywords": ["volvo brake pad", "fh12 brake pad", "truck brake pad", "front axle brake pad", "heavy duty brake pad", "semi metallic brake pad", "commercial vehicle brake", "brake pad set"],
+  "selling_points": ["Matches OE dimensions for direct fit", "Semi-metallic compound for stable braking", "Every set inspected before shipment", "Export packing with color box"],
+  "faq": [
+    {"q": "How do I confirm this pad fits my truck?", "a": "Send us the OE number or a photo of the old pad and we will confirm fitment before you order."},
+    {"q": "What is the minimum order quantity?", "a": "MOQ is 50 sets; samples are available for new customers."},
+    {"q": "Is there a warranty?", "a": "12 months or 50,000 km against manufacturing defects."}
+  ],
+  "category": "刹车片",
+  "attributes": {"friction_material": "semi-metallic"},
+  "confidence": 0.78
+}

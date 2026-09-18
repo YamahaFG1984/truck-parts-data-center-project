@@ -1,0 +1,8 @@
+{
+  "_note": "Mock output. 26570367 is FIT-BCH-00001 in the default seed, so offline image search finds a real demo part.",
+  "part_type": "spring brake chamber",
+  "visible_numbers": ["26570367"],
+  "brand_hints": ["Volvo"],
+  "description": "Round double-diaphragm brake chamber with clamp band and two threaded mounting studs; label partly worn.",
+  "confidence": 0.72
+}

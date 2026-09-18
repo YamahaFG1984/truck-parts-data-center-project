@@ -1,0 +1,12 @@
+{
+  "_note": "Mock output for a two-line catalog snippet.",
+  "records": [
+    {"name_en": "Brake Pad Set, Front Axle", "name_zh": "前刹车片", "oe_numbers": ["20443906", "20568713"],
+     "cross_numbers": ["K001234"], "supplier_pn": "HB-2044", "brand_hints": ["Volvo", "Knorr-Bremse"],
+     "fitment": [{"make": "Volvo", "model": "FH12", "engine": "D12"}],
+     "unit_cost": 18.5, "currency": "USD", "moq": 50, "lead_days": 25, "notes": null},
+    {"name_en": "Air Filter", "name_zh": null, "oe_numbers": ["1869993"], "cross_numbers": [],
+     "supplier_pn": null, "brand_hints": ["Scania"], "fitment": [{"make": "Scania", "model": "R-series", "engine": null}],
+     "unit_cost": null, "currency": null, "moq": null, "lead_days": null, "notes": "价格待确认"}
+  ]
+}

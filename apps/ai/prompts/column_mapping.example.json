@@ -1,0 +1,13 @@
+{
+  "_note": "Mock output. Covers the headers of media/demo/supplier_quote_messy.xlsx.",
+  "mapping": [
+    {"header": "Part No.", "field": "supplier_pn", "confidence": 0.85, "reason": "HB- 前缀是供应商自己的料号"},
+    {"header": "OEM NO", "field": "oe_number", "confidence": 0.95, "reason": "OEM NO 即原厂号"},
+    {"header": "Ref", "field": "cross_number", "confidence": 0.7, "reason": "Ref 列为其他品牌编号"},
+    {"header": "Description", "field": "name_en", "confidence": 0.9, "reason": "英文品名"},
+    {"header": "适用车型", "field": "make", "confidence": 0.8, "reason": "适配车型，品牌与车系混写"},
+    {"header": "MOQ", "field": "moq", "confidence": 0.95, "reason": "最小起订量"},
+    {"header": "FOB Price(USD)", "field": "unit_cost", "confidence": 0.95, "reason": "FOB 单价，美元"},
+    {"header": "Packing", "field": "pcs_per_carton", "confidence": 0.5, "reason": "多为每箱数量，也混有箱规与重量"}
+  ]
+}
