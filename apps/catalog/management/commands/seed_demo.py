@@ -6,6 +6,7 @@ from django.db import transaction
 
 from apps.catalog.demo import DEFAULT_SEED, reset_catalog, seed_catalog
 from apps.catalog.models import Part
+from apps.catalog.services.quality import recompute
 from scripts.make_supplier_excel import write_supplier_excel
 
 
@@ -40,6 +41,7 @@ class Command(BaseCommand):
                 self.stdout.write("已清空产品目录与供应商。")
             result = seed_catalog(parts=options["parts"], seed=options["seed"])
             offers = seed_offers(seed=options["seed"])
+            recompute()
 
         excel = write_supplier_excel(
             Path(settings.MEDIA_ROOT) / "demo" / "supplier_quote_messy.xlsx",

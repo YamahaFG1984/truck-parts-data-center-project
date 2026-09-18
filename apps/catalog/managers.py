@@ -13,7 +13,7 @@ from django.db.models import (
 from .services.normalize import normalize_number
 
 
-def _has(model_label: str, **filters) -> Exists:
+def has_related(model_label: str, **filters) -> Exists:
     """Exists() over a model with a `part` FK. Resolved by name at call time, so
     catalog never imports other apps (suppliers depends on catalog, not back)."""
     from django.apps import apps
@@ -28,13 +28,13 @@ def _has(model_label: str, **filters) -> Exists:
 MISSING_FILTERS = {
     "name": lambda: Q(name_en=""),
     "category": lambda: Q(category__isnull=True),
-    "oe": lambda: ~_has("PartNumber", kind="OE"),
-    "cross": lambda: ~_has("PartNumber", kind="CROSS"),
-    "fitment": lambda: ~_has("Fitment"),
-    "image": lambda: ~_has("PartImage", is_primary=True),
+    "oe": lambda: ~has_related("PartNumber", kind="OE"),
+    "cross": lambda: ~has_related("PartNumber", kind="CROSS"),
+    "fitment": lambda: ~has_related("Fitment"),
+    "image": lambda: ~has_related("PartImage", is_primary=True),
     "description": lambda: Q(description_en=""),
     "packaging": lambda: Q(packaging={}),
-    "offer": lambda: ~_has("suppliers.SupplierOffer"),
+    "offer": lambda: ~has_related("suppliers.SupplierOffer"),
 }
 
 

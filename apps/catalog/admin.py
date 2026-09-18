@@ -7,6 +7,7 @@ from django.utils.html import format_html
 
 from .models import Brand, Category, Fitment, Part, PartImage, PartNumber
 from .services.normalize import normalize_number
+from .services.quality import recompute
 
 
 def _score_badge(score: int) -> str:
@@ -161,6 +162,11 @@ class PartAdmin(NormalizedNumberSearchMixin, SourcedAdminMixin, admin.ModelAdmin
             .get_queryset(request)
             .prefetch_related(Prefetch("images", queryset=primary, to_attr="primary_images"))
         )
+
+    def save_related(self, request, form, formsets, change):
+        """Inlines (numbers, fitments, images) are saved here, so score afterwards."""
+        super().save_related(request, form, formsets, change)
+        recompute(Part.objects.filter(pk=form.instance.pk))
 
     @admin.display(description="主图")
     def thumbnail(self, obj):
