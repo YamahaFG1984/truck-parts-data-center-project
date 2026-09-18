@@ -27,3 +27,4 @@ DJANGO_SETTINGS_MODULE = "config.settings.test"
 testpaths = ["apps"]
 python_files = ["test_*.py", "tests.py"]
 addopts = "--strict-markers"
+markers = ["postgres: needs PostgreSQL features such as pg_trgm; skipped on SQLite"]
