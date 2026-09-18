@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load catalog_tags %}
+
+{% block title %}产品列表 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{% url 'core:quality' %}" class="hover:text-blue-700">数据质量看板</a> / 产品列表</nav>
+<div class="flex flex-wrap items-baseline gap-3 mb-3">
+  <h1 class="text-2xl font-bold">产品列表</h1>
+  <span class="text-slate-500">共 {{ paginator.count }} 个</span>
+  {% for key, label in filters %}<span class="rounded-full bg-blue-100 text-blue-800 px-3 py-0.5 text-sm">{{ label }}</span>{% endfor %}
+  {% if filters %}<a href="{% url 'catalog:part_list' %}" class="text-sm text-blue-700 hover:underline">清除筛选</a>{% endif %}
+</div>
+<p class="text-sm text-slate-500 mb-4">按完整度从低到高排列，最需要补的在最前面。</p>
+
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500">
+    <tr><th class="py-2 px-3">图</th><th class="py-2 px-3">SKU</th><th class="py-2 px-3">品名</th><th class="py-2 px-3 hidden sm:table-cell">分类</th><th class="py-2 px-3 hidden sm:table-cell">状态</th><th class="py-2 px-3">完整度</th></tr>
+  </thead>
+  <tbody>
+  {% for part in parts %}
+    <tr class="border-t border-slate-100">
+      <td class="py-1 px-3">{% if part.primary_images %}<img src="{{ part.primary_images.0.image.url }}" alt="" loading="lazy" class="h-9 w-12 object-cover rounded">{% else %}<span class="text-xs text-slate-400">无图</span>{% endif %}</td>
+      <td class="py-1 px-3 whitespace-nowrap"><a href="{% url 'catalog:part_detail' part.sku %}" class="text-blue-700 hover:underline">{{ part.sku }}</a></td>
+      <td class="py-1 px-3">{{ part.name_en|default:part.name_zh|default:"—" }}</td>
+      <td class="py-1 px-3 hidden sm:table-cell text-slate-600">{{ part.category|default:"未分类" }}</td>
+      <td class="py-1 px-3 hidden sm:table-cell">{{ part.get_status_display }}</td>
+      <td class="py-1 px-3">{% score_badge part.completeness_score %}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="6" class="py-6 text-center text-slate-400">没有符合条件的产品。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+{% if is_paginated %}
+<nav class="mt-4 flex items-center gap-3 text-sm">
+  {% if page_obj.has_previous %}<a class="text-blue-700 hover:underline" href="?{{ querystring }}{% if querystring %}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>{% endif %}
+  <span class="text-slate-500">第 {{ page_obj.number }} / {{ paginator.num_pages }} 页</span>
+  {% if page_obj.has_next %}<a class="text-blue-700 hover:underline" href="?{{ querystring }}{% if querystring %}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

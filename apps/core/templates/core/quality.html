@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}数据质量看板 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-1">数据质量看板</h1>
+<p class="text-sm text-slate-500 mb-5">每个数字都可以点开，看到背后是哪些 SKU。完整度在导入、保存和 <code class="bg-slate-100 px-1 rounded">recompute_quality</code> 后更新。</p>
+
+<section class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+  <a href="{% url 'catalog:part_list' %}" class="rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400">
+    <div class="text-sm text-slate-500">SKU 总数</div>
+    <div class="text-3xl font-bold">{{ stats.total }}</div>
+  </a>
+  <div class="rounded-lg border border-slate-200 bg-white p-4">
+    <div class="text-sm text-slate-500">平均完整度</div>
+    <div class="text-3xl font-bold">{{ stats.average }}</div>
+  </div>
+  <a href="{% url 'catalog:part_list' %}?score=90-100" class="rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400">
+    <div class="text-sm text-slate-500">完整度 ≥ 90 占比</div>
+    <div class="text-3xl font-bold">{{ stats.complete_share }}%</div>
+  </a>
+  <a href="#duplicates" class="rounded-lg border border-slate-200 bg-white p-4 hover:border-blue-400">
+    <div class="text-sm text-slate-500">疑似重复</div>
+    <div class="text-3xl font-bold {% if stats.duplicate_groups %}text-amber-600{% endif %}">{{ stats.duplicate_groups }} <span class="text-base font-normal text-slate-500">组</span></div>
+  </a>
+</section>
+
+<div class="grid gap-4 lg:grid-cols-2">
+  <section class="rounded-lg border border-slate-200 bg-white p-4">
+    <h2 class="font-semibold mb-3">完整度分布</h2>
+    <ul class="space-y-2">
+      {% for b in buckets %}
+      <li>
+        <a href="{% url 'catalog:part_list' %}?score={{ b.low }}-{{ b.high }}" class="grid grid-cols-[4.5rem_1fr_3.5rem] items-center gap-2 text-sm group">
+          <span class="text-slate-600">{{ b.label }}</span>
+          <span class="h-5 rounded bg-slate-100 overflow-hidden">
+            <span class="block h-full rounded {% if forloop.counter == 1 %}bg-red-400{% elif forloop.counter == 2 %}bg-amber-400{% elif forloop.counter == 3 %}bg-sky-400{% else %}bg-emerald-500{% endif %} group-hover:opacity-80" style="width: {{ b.percent }}%"></span>
+          </span>
+          <span class="text-right tabular-nums">{{ b.count }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+
+  <section class="rounded-lg border border-slate-200 bg-white p-4">
+    <h2 class="font-semibold mb-3">缺失项 <span class="text-sm font-normal text-slate-500">按数量排序，先补多的</span></h2>
+    <ul class="space-y-2">
+      {% for m in missing %}
+      <li>
+        <a href="{% url 'catalog:part_list' %}?missing={{ m.key }}" class="grid grid-cols-[6.5rem_1fr_3.5rem] items-center gap-2 text-sm group">
+          <span class="text-slate-600">{{ m.label }}</span>
+          <span class="h-5 rounded bg-slate-100 overflow-hidden">
+            <span class="block h-full rounded bg-rose-400 group-hover:opacity-80" style="width: {{ m.percent }}%"></span>
+          </span>
+          <span class="text-right tabular-nums">{{ m.count }}</span>
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+</div>
+
+<section id="duplicates" class="mt-6 rounded-lg border border-slate-200 bg-white p-4">
+  <h2 class="font-semibold mb-1">疑似重复</h2>
+  <p class="text-sm text-slate-500 mb-3">同一个 OE 号或互换号挂在多个 SKU 上。可能是重复录入需要合并，也可能是真正的替代件，需要人来判断。</p>
+  {% if duplicate_groups %}
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead><tr class="text-left text-slate-500"><th class="py-1 pr-3">编号（归一化）</th><th class="py-1">涉及的 SKU</th></tr></thead>
+    <tbody>
+      {% for norm, parts in duplicate_groups %}
+      <tr class="border-t border-slate-100 align-top">
+        <td class="py-2 pr-3"><code>{{ norm }}</code></td>
+        <td class="py-2">
+          {% for p in parts %}
+          <div class="flex flex-wrap gap-x-3">
+            <a href="{% url 'catalog:part_detail' p.sku %}" class="text-blue-700 hover:underline">{{ p.sku }}</a>
+            <span class="text-slate-600">{{ p.name_en|default:p.name_zh }}</span>
+            {% if user.is_staff %}<a href="{% url 'admin:catalog_part_change' p.pk %}" class="text-slate-400 hover:text-blue-700">后台</a>{% endif %}
+          </div>
+          {% endfor %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="text-sm text-slate-400">没有疑似重复。</p>{% endif %}
+</section>
+{% endblock %}

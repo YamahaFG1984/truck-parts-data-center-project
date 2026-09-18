@@ -21,7 +21,7 @@
         <a class="hover:text-blue-700" href="{% url 'core:home' %}">首页</a>
         <a class="hover:text-blue-700" href="{% url 'catalog:search' %}">搜索</a>
         <a class="hover:text-blue-700" href="/import/">导入</a>
-        <a class="hover:text-blue-700" href="/quality/">看板</a>
+        <a class="hover:text-blue-700" href="{% url 'core:quality' %}">看板</a>
         <a class="hover:text-blue-700" href="/ai/review/">审核</a>
         <a class="hover:text-blue-700" href="/inquiry/">询价</a>
         {% if user.is_staff %}<a class="hover:text-blue-700" href="{% url 'admin:index' %}">后台</a>{% endif %}

@@ -136,8 +136,8 @@ def test_recompute_command():
 
 
 @pytest.mark.parametrize(
-    ("score", "bucket"), [(0, "0–40"), (39, "0–40"), (40, "40–70"), (69, "40–70"),
-                          (70, "70–90"), (89, "70–90"), (90, "90–100"), (100, "90–100")],
+    ("score", "bucket"), [(0, "0–39"), (39, "0–39"), (40, "40–69"), (69, "40–69"),
+                          (70, "70–89"), (89, "70–89"), (90, "90–100"), (100, "90–100")],
 )
 def test_summary_bucket_boundaries(score, bucket):
     PartFactory(completeness_score=score)

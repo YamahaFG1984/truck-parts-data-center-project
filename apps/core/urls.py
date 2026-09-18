@@ -6,4 +6,5 @@ app_name = "core"
 
 urlpatterns = [
     path("", views.HomeView.as_view(), name="home"),
+    path("quality/", views.QualityDashboardView.as_view(), name="quality"),
 ]

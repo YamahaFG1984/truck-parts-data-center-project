@@ -7,7 +7,7 @@ SELECT with Exists() annotations and one UPDATE per 500 changed rows.
 
 from dataclasses import dataclass, field
 
-from django.db.models import Count, Q, QuerySet
+from django.db.models import Avg, Count, Q, QuerySet
 
 from ..managers import MISSING_FILTERS, has_related
 from ..models import Part, PartNumber
@@ -24,7 +24,21 @@ WEIGHTS = {
     "packaging": 5,  # pcs_per_carton and gross weight
     "offer": 10,  # at least one supplier quote
 }
-BUCKETS = [("0–40", 0, 40), ("40–70", 40, 70), ("70–90", 70, 90), ("90–100", 90, 101)]
+# Labels for the dashboard and part list filters (keys of MISSING_FILTERS).
+MISSING_LABELS = {
+    "name": "缺英文品名",
+    "category": "缺分类",
+    "oe": "缺 OE 号",
+    "cross": "缺互换号",
+    "fitment": "缺适配车型",
+    "image": "缺主图",
+    "description": "缺英文描述",
+    "packaging": "缺包装信息",
+    "offer": "缺供应商报价",
+}
+# (label, low, high), both ends inclusive, so a list filtered by ?score=low-high
+# shows exactly the parts counted in the bucket.
+BUCKETS = [("0–39", 0, 39), ("40–69", 40, 69), ("70–89", 70, 89), ("90–100", 90, 100)]
 BATCH_SIZE = 500
 _FLAGS = {
     "_has_oe": lambda: has_related("PartNumber", kind="OE"),
@@ -93,9 +107,9 @@ def recompute(parts: QuerySet[Part] | None = None) -> int:
 
 def summary() -> dict:
     """Dashboard numbers in one aggregate query, plus the duplicate group count."""
-    aggregates = {"total": Count("pk")}
+    aggregates = {"total": Count("pk"), "average": Avg("completeness_score")}
     aggregates |= {
-        f"bucket_{i}": Count("pk", filter=Q(completeness_score__gte=lo, completeness_score__lt=hi))
+        f"bucket_{i}": Count("pk", filter=Q(completeness_score__gte=lo, completeness_score__lte=hi))
         for i, (_, lo, hi) in enumerate(BUCKETS)
     }
     aggregates |= {
@@ -104,8 +118,12 @@ def summary() -> dict:
     row = Part.objects.aggregate(**aggregates)
     return {
         "total": row["total"],
+        "average": round(row["average"] or 0),
+        "complete_share": (
+            round(100 * row[f"bucket_{len(BUCKETS) - 1}"] / row["total"]) if row["total"] else 0
+        ),
         "distribution": [
-            {"label": label, "count": row[f"bucket_{i}"], "low": lo, "high": min(hi, 100)}
+            {"label": label, "count": row[f"bucket_{i}"], "low": lo, "high": hi}
             for i, (label, lo, hi) in enumerate(BUCKETS)
         ],
         "missing": {k: row[f"missing_{k}"] for k in MISSING_FILTERS},
