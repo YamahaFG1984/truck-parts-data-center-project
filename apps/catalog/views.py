@@ -47,7 +47,13 @@ class PartDetailView(DetailView):
         context = super().get_context_data(**kwargs)
         alts = alternatives(self.object).select_related("category__parent")[:20]
         alts = prefetch_for_cards(list(alts))
-        context.update(alternatives=alts, attribute_rows=self.object.attribute_rows())
+        context.update(
+            alternatives=alts,
+            attribute_rows=self.object.attribute_rows(),
+            # ai.AISuggestion via its related_name: catalog does not import the ai app.
+            pending_suggestion=self.object.suggestions.filter(status="pending")
+            .select_related("ai_task").first(),
+        )
         return context
 
 

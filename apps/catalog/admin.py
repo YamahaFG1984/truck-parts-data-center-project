@@ -142,7 +142,8 @@ class PartAdmin(NormalizedNumberSearchMixin, SourcedAdminMixin, admin.ModelAdmin
         (None, {"fields": ["sku", "name_en", "name_zh", "category", "status"]}),
         (
             "规格与内容",
-            {"fields": ["attributes", "packaging", "description_en", "keywords", "notes"]},
+            {"fields": ["attributes", "packaging", "description_en", "title_en", "keywords",
+                        "selling_points", "faq", "notes"]},
         ),
         (
             "来源与质量",

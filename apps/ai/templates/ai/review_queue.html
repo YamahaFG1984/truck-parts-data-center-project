@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}AI 审核台 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-1">AI 审核台</h1>
+<p class="text-sm text-slate-500 mb-4">AI 只提建议，采纳了才写进产品。每个字段可以单独勾选；已人工确认的产品，已有的值不会被覆盖。采纳的字段来源记为 AI，并在产品备注里留痕。</p>
+
+<nav class="flex flex-wrap gap-2 mb-5 text-sm">
+  {% for value, label, count in tabs %}
+  <a href="?status={{ value }}" class="rounded-full px-3 py-1 {% if value == status %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600 hover:bg-slate-200{% endif %}">{{ label }} {{ count }}</a>
+  {% endfor %}
+</nav>
+
+{% for suggestion in suggestions %}
+  {% include "ai/partials/suggestion.html" %}
+{% empty %}
+  <div class="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
+    {% if status == "pending" %}没有待审核的建议。可以在产品详情页点"AI 补全"生成。{% else %}没有记录。{% endif %}
+  </div>
+{% endfor %}
+
+{% if is_paginated %}
+<nav class="mt-4 flex items-center gap-3 text-sm">
+  {% if page_obj.has_previous %}<a class="text-blue-700 hover:underline" href="?status={{ status }}&amp;page={{ page_obj.previous_page_number }}">上一页</a>{% endif %}
+  <span class="text-slate-500">第 {{ page_obj.number }} / {{ paginator.num_pages }} 页</span>
+  {% if page_obj.has_next %}<a class="text-blue-700 hover:underline" href="?status={{ status }}&amp;page={{ page_obj.next_page_number }}">下一页</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

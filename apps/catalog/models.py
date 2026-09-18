@@ -85,6 +85,10 @@ class Part(TimeStampedModel, SourcedModel):
     )
     attributes = models.JSONField("规格属性", default=dict, db_default={}, blank=True)
     description_en = models.TextField("英文描述", blank=True)
+    # Listing content for Alibaba / Shopify (filled by reviewed AI suggestions, M15).
+    title_en = models.CharField("上架标题", max_length=120, blank=True)
+    selling_points = models.JSONField("卖点", default=list, db_default=[], blank=True)
+    faq = models.JSONField("FAQ", default=list, db_default=[], blank=True)
     keywords = models.JSONField("关键词", default=list, db_default=[], blank=True)
     packaging = models.JSONField("包装", default=dict, db_default={}, blank=True)
     status = models.CharField(

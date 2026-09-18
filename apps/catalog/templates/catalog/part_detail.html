@@ -123,12 +123,28 @@
     </section>
 
     <section class="rounded-lg border border-slate-200 bg-white p-4">
-      <h2 class="font-semibold mb-2">英文描述</h2>
+      <h2 class="font-semibold mb-2">英文内容</h2>
+      {% if part.title_en %}<p class="text-sm font-medium mb-1">{{ part.title_en }}</p>{% endif %}
       {% if part.description_en %}<p class="text-sm leading-relaxed">{{ part.description_en }}</p>{% else %}<p class="text-sm text-red-600">缺少英文描述</p>{% endif %}
+      {% if part.selling_points %}<ul class="mt-2 list-disc pl-5 text-sm">{% for point in part.selling_points %}<li>{{ point }}</li>{% endfor %}</ul>{% endif %}
       {% if part.keywords %}<p class="mt-2 text-xs text-slate-500">关键词：{{ part.keywords|join:", " }}</p>{% endif %}
     </section>
   </div>
 </div>
+
+<section class="mt-6">
+  <div class="flex flex-wrap items-center gap-3 mb-2">
+    <h2 class="text-lg font-semibold">AI 补全</h2>
+    <span class="text-sm text-slate-500">生成上架标题、描述、关键词、卖点和 FAQ，进审核台，采纳后才写入。</span>
+    {% if not pending_suggestion %}
+    <button type="button" class="ml-auto rounded bg-violet-700 px-4 py-1.5 text-sm text-white hover:bg-violet-800"
+            hx-post="{% url 'ai:enrich' part.sku %}" hx-target="#ai-suggestion" hx-swap="innerHTML"
+            hx-indicator="#ai-spinner">AI 补全</button>
+    <span id="ai-spinner" class="htmx-indicator text-sm text-slate-500">AI 生成中…</span>
+    {% endif %}
+  </div>
+  <div id="ai-suggestion">{% if pending_suggestion %}{% include "ai/partials/suggestion.html" with suggestion=pending_suggestion %}{% endif %}</div>
+</section>
 
 <section class="mt-6">
   <h2 class="text-lg font-semibold mb-2">替代件 <span class="text-sm font-normal text-slate-500">共享任一 OE 号或互换号的其他产品</span></h2>

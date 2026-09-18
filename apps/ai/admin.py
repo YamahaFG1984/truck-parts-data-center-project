@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AITask
+from .models import AISuggestion, AITask
 
 
 @admin.register(AITask)
@@ -16,3 +16,13 @@ class AITaskAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(AISuggestion)
+class AISuggestionAdmin(admin.ModelAdmin):
+    list_display = ["created_at", "part", "status", "confidence", "reviewed_by", "reviewed_at"]
+    list_filter = ["status"]
+    list_select_related = ["part", "reviewed_by"]
+    search_fields = ["part__sku", "reason"]
+    raw_id_fields = ["part", "ai_task"]
+    readonly_fields = ["payload", "accepted_fields", "reviewed_by", "reviewed_at"]

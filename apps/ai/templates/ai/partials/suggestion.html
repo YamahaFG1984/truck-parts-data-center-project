@@ -1,0 +1,47 @@
+{% load ai_tags %}
+{% if error %}
+<div id="ai-suggestion-error" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800" hx-target="this" hx-swap="outerHTML">
+  {{ error }}
+  {% if part %}<button type="button" class="ml-3 text-blue-700 hover:underline" hx-post="{% url 'ai:enrich' part.sku %}">重试</button>{% endif %}
+</div>
+{% else %}
+{% with s=suggestion %}
+<article id="suggestion-{{ s.pk }}" class="rounded-lg border border-slate-200 bg-white mb-4" hx-target="this" hx-swap="outerHTML">
+  {% if flash %}<div class="px-4 py-2 text-sm {% if flash_error %}bg-red-50 text-red-800{% else %}bg-emerald-50 text-emerald-800{% endif %}">{{ flash }}</div>{% endif %}
+  <header class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 border-b border-slate-100">
+    <a href="{% url 'catalog:part_detail' s.part.sku %}" class="font-semibold text-blue-700 hover:underline">{{ s.part.sku }}</a>
+    <span class="text-slate-600">{{ s.part.name_en|default:s.part.name_zh }}</span>
+    <span class="rounded px-2 py-0.5 text-xs {% if s.status == 'pending' %}bg-violet-100 text-violet-800{% elif s.status == 'accepted' %}bg-emerald-100 text-emerald-800{% else %}bg-slate-200 text-slate-600{% endif %}">{{ s.get_status_display }}</span>
+    <span class="text-xs text-slate-500 ml-auto">AI 置信度 {{ s.confidence }} · {{ s.ai_task.model|default:"—" }} · {{ s.created_at|date:"m-d H:i" }}</span>
+  </header>
+
+  <form method="post" action="{% url 'ai:accept' s.pk %}">
+    {% csrf_token %}
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3 w-8"></th><th class="py-2 px-3 w-24">字段</th><th class="py-2 px-3">当前值</th><th class="py-2 px-3">AI 建议</th></tr></thead>
+      <tbody>
+      {% for row in s.rows %}
+        <tr class="border-t border-slate-100 align-top">
+          <td class="py-2 px-3">{% if s.status == 'pending' %}<input type="checkbox" name="fields" value="{{ row.key }}" {% if not row.applicable %}disabled{% elif not row.replaces %}checked{% endif %} aria-label="采纳{{ row.label }}">{% elif row.key in s.accepted_fields %}✓{% endif %}</td>
+          <td class="py-2 px-3 whitespace-nowrap text-slate-600">{{ row.label }}</td>
+          <td class="py-2 px-3 text-slate-600">{{ row.current|show_value }}</td>
+          <td class="py-2 px-3">{{ row.suggested|show_value }}{% if row.why %}<div class="mt-1 text-xs text-amber-700">{{ row.why }}</div>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if s.status == 'pending' %}
+    <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-t border-slate-100">
+      <button type="submit" class="rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800" hx-post="{% url 'ai:accept' s.pk %}" hx-include="closest form">采纳所选字段</button>
+      <input type="text" name="reason" placeholder="拒绝原因（必填，用于改进提示词）" class="flex-1 min-w-[12rem] rounded border border-slate-300 px-3 py-2 text-sm">
+      <button type="submit" formaction="{% url 'ai:reject' s.pk %}" class="rounded border border-slate-300 px-4 py-2 text-slate-700 hover:border-red-400 hover:text-red-700" hx-post="{% url 'ai:reject' s.pk %}" hx-include="closest form">拒绝</button>
+    </div>
+    {% elif s.reviewed_by %}
+    <p class="px-4 py-3 border-t border-slate-100 text-xs text-slate-500">{{ s.reviewed_by }} 于 {{ s.reviewed_at|date:"Y-m-d H:i" }} {{ s.get_status_display }}{% if s.reason %}：{{ s.reason }}{% endif %}</p>
+    {% endif %}
+  </form>
+</article>
+{% endwith %}
+{% endif %}
