@@ -30,8 +30,10 @@ INSTALLED_APPS = [
     "django.contrib.postgres",
     # third party
     "django_htmx",
+    "django_q",
     # local
     "apps.core",
+    "apps.users",
 ]
 
 MIDDLEWARE = [
@@ -76,6 +78,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Auth ---------------------------------------------------------------------
 
+AUTH_USER_MODEL = "users.User"
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -103,6 +106,17 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
+
+# --- Background tasks (django-q2, ORM broker: task table lives in the DB) ------
+
+Q_CLUSTER = {
+    "name": "tpdc",
+    "orm": "default",
+    "workers": 2,
+    "timeout": 300,
+    "retry": 360,  # must exceed timeout
+    "sync": False,
+}
 
 # --- LLM (see docs/architecture.html §7.4) ------------------------------------
 
