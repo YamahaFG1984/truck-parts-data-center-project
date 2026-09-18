@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>施工进度表 · 卡车配件 AI 产品数据中心</title>
+<meta name="description" content="卡车配件 AI 产品数据库 MVP 的施工进度表：20 个里程碑，每个一次提交一次审核，含验收命令、审核清单、推荐模型与接手说明。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a href="prd.html">PRD</a>
+    <a href="architecture.html">架构设计</a>
+    <a href="data-dictionary.html">数据字典</a>
+    <a class="active" href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>施工进度表</h1>
+<p class="lede">20 个里程碑。每个里程碑恰好一次 git 提交、一次代码审核，新增代码控制在 300 行以内。任何模型或工程师都可以从任一里程碑接手。</p>
+<p class="meta">版本 v1.0 · 2026-09-18 · 预计总工时约 56 小时，约 7 个工作日</p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#rules">施工规则</a></li>
+<li><a href="#overview">里程碑总览</a></li>
+<li><a href="#milestones">里程碑明细 M01–M20</a></li>
+<li><a href="#handoff">交接说明：给接手模型</a></li>
+<li><a href="#review">审核流程：给项目作者</a></li>
+</ol></div>
+
+<h2 id="rules">施工规则</h2>
+<ol>
+<li><b>一个里程碑一次提交。</b>提交信息用 Conventional Commits 并带编号，如 <code>feat(catalog): three-level matcher (M07)</code>；提交后打标签 <code>M07</code>。</li>
+<li><b>只做清单上的事。</b>不提前实现后续里程碑的内容，不引入清单外依赖，不重构无关代码。发现文档遗漏时先报告再动手。</li>
+<li><b>验收命令必须全部通过</b>才允许提交。验收输出原样贴给审核者。</li>
+<li><b>提交后停下</b>，等待审核。审核提出的修改作为独立的 <code>fix(...)</code> 提交。</li>
+<li><b>更新进度。</b>提交后把 <code>docs/index.html</code> 进度表对应行改为"已提交"并填 commit 短哈希。</li>
+<li><b>规范来源。</b>字段定义以<a href="data-dictionary.html">数据字典</a>为准，模块与函数命名以<a href="architecture.html">架构设计</a>为准，验收标准以<a href="prd.html">PRD</a>为准。三者冲突时以架构设计为准并报告冲突。</li>
+</ol>
+<h3>推荐执行模型</h3>
+<p><span class="tag opus">Opus</span> 逻辑重、需要判断与取舍的里程碑（匹配、映射、LLM 封装、图片询价、AI 补全）。<span class="tag codex">Codex / Sonnet</span> 规格已完全给定、以模板与配置为主的机械性里程碑。作者额度充裕时全部用 Opus 亦可；反之按标注分配可省约一半成本。</p>
+
+<h2 id="overview">里程碑总览</h2>
+<div class="tbl"><table>
+<tr><th>#</th><th>里程碑</th><th>对应功能</th><th>模型</th><th>工时</th><th>依赖</th></tr>
+<tr><td>M01</td><td>项目骨架与 settings 分层</td><td>基础</td><td><span class="tag codex">Codex</span></td><td>2h</td><td>—</td></tr>
+<tr><td>M02</td><td>PostgreSQL、自定义 User、CI</td><td>基础</td><td><span class="tag codex">Codex</span></td><td>1.5h</td><td>M01</td></tr>
+<tr><td>M03</td><td>编号归一化服务</td><td>F3</td><td><span class="tag opus">Opus</span></td><td>2h</td><td>M01</td></tr>
+<tr><td>M04</td><td>catalog 数据模型</td><td>F0</td><td><span class="tag codex">Sonnet</span></td><td>3h</td><td>M02, M03</td></tr>
+<tr><td>M05</td><td>Django Admin 后台</td><td>F0</td><td><span class="tag codex">Codex</span></td><td>2h</td><td>M04</td></tr>
+<tr><td>M06</td><td>演示数据生成</td><td>基础</td><td><span class="tag codex">Codex</span></td><td>3h</td><td>M04</td></tr>
+<tr><td>M07</td><td>三级匹配服务</td><td>F3</td><td><span class="tag opus">Opus</span></td><td>4h</td><td>M04, M06</td></tr>
+<tr><td>M08</td><td>智能查询页与产品详情页</td><td>F3</td><td><span class="tag codex">Sonnet</span></td><td>3h</td><td>M07</td></tr>
+<tr><td>M09</td><td>suppliers 供应商与报价</td><td>F6</td><td><span class="tag codex">Codex</span></td><td>2h</td><td>M04</td></tr>
+<tr><td>M10</td><td>数据完整度评分</td><td>F2</td><td><span class="tag codex">Sonnet</span></td><td>2h</td><td>M09</td></tr>
+<tr><td>M11</td><td>数据质量看板</td><td>F2</td><td><span class="tag codex">Sonnet</span></td><td>2.5h</td><td>M10</td></tr>
+<tr><td>M12</td><td>importer 上传与预览</td><td>F1</td><td><span class="tag codex">Sonnet</span></td><td>3h</td><td>M09</td></tr>
+<tr><td>M13</td><td>LLM 封装、mock 与调用审计</td><td>F5</td><td><span class="tag opus">Opus</span></td><td>4h</td><td>M01</td></tr>
+<tr><td>M14</td><td>列映射与导入执行</td><td>F1</td><td><span class="tag opus">Opus</span></td><td>4h</td><td>M12, M13, M10</td></tr>
+<tr><td>M15</td><td>AI 补全与审核工作台</td><td>F5</td><td><span class="tag opus">Opus</span></td><td>4h</td><td>M13, M10</td></tr>
+<tr><td>M16</td><td>后台批量任务</td><td>F1, F5</td><td><span class="tag codex">Sonnet</span></td><td>2h</td><td>M14, M15</td></tr>
+<tr><td>M17</td><td>图片询价</td><td>F4</td><td><span class="tag opus">Opus</span></td><td>3.5h</td><td>M13, M07</td></tr>
+<tr><td>M18</td><td>询价留痕与一键报价单</td><td>F6, F7</td><td><span class="tag codex">Sonnet</span></td><td>3h</td><td>M08, M09, M17</td></tr>
+<tr><td>M19</td><td>平台上架导出</td><td>F8</td><td><span class="tag codex">Codex</span></td><td>2h</td><td>M15</td></tr>
+<tr><td>M20</td><td>首页仪表盘、README、演示脚本</td><td>收尾</td><td><span class="tag codex">Sonnet</span></td><td>3h</td><td>全部</td></tr>
+</table></div>
+<p>依赖允许并行：M03 与 M02 可同时进行；M13 只依赖 M01，可在 M04–M12 期间穿插；M09 可在 M07 之前做。单人顺序执行时按编号即可。</p>
+
+<h2 id="milestones">里程碑明细</h2>
+
+<div class="ms" id="m01"><div class="head"><h3>M01 · 项目骨架与 settings 分层</h3><span class="tag codex">Codex</span><span class="tag">2h</span><span class="tag">≤ 250 行</span></div><div class="body">
+<h4>目标</h4><p>可运行的空 Django 项目，settings 按 Two Scoops 分层，工具链与接手文件就位。本里程碑使用 SQLite。</p>
+<h4>文件</h4>
+<ul>
+<li><code>manage.py</code>、<code>config/__init__.py</code>、<code>config/urls.py</code>、<code>config/wsgi.py</code>、<code>config/asgi.py</code></li>
+<li><code>config/settings/{__init__,base,local,test,production}.py</code>：base 含附录 B 的全部键（AUTH_USER_MODEL 与 django_q 相关项在 M02 加入）；local 开 DEBUG 与 debug-toolbar；test 固定 <code>LLM_PROVIDER=mock</code>；production 关 DEBUG、开安全头、whitenoise 压缩存储</li>
+<li><code>apps/__init__.py</code>、<code>apps/core/</code>：<code>models.py</code> 定义抽象 <code>TimeStampedModel</code> 与 <code>SourcedModel</code>（source、confidence、verified、verified_by、verified_at）；<code>views.py</code> 一个占位首页；<code>urls.py</code></li>
+<li><code>templates/base.html</code>：Tailwind CDN、HTMX、Alpine，顶部导航（首页 / 搜索 / 导入 / 看板 / 审核 / 询价 / 后台），页脚"演示数据"声明；<code>static/vendor/</code> 放 htmx.min.js 与 alpine.min.js 本地副本</li>
+<li><code>requirements/{base,local,production}.txt</code>、<code>pyproject.toml</code>（ruff：line-length 100，select E F I UP；pytest：<code>DJANGO_SETTINGS_MODULE=config.settings.test</code>，<code>testpaths=apps</code>）</li>
+<li><code>.env.example</code>（附录 B 全部键）、<code>.gitignore</code>、<code>README.md</code>（三行简介 + 指向 docs/）</li>
+<li><code>AGENTS.md</code>、<code>CLAUDE.md</code>：内容见本页交接说明，两个文件内容相同</li>
+<li><code>apps/core/tests/test_smoke.py</code>：首页返回 302（未登录）与登录后 200</li>
+</ul>
+<h4>验收</h4>
+<pre><code>git init &amp;&amp; python -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements/local.txt
+cp .env.example .env
+python manage.py check              # System check identified no issues
+python manage.py migrate            # SQLite，成功
+ruff check .                        # All checks passed
+pytest -q                           # 2 passed
+git add -A &amp;&amp; git commit -m "chore: project skeleton with layered settings (M01)" &amp;&amp; git tag M01</code></pre>
+<h4>审核清单</h4>
+<ul><li><code>config/settings/base.py</code> 没有任何硬编码密钥或绝对路径。</li><li><code>INSTALLED_APPS</code> 使用 <code>apps.core</code> 形式。</li><li><code>.gitignore</code> 含 <code>.env</code>、<code>media/</code>、<code>db.sqlite3</code>。</li><li><code>AGENTS.md</code> 与 <code>CLAUDE.md</code> 内容一致。</li></ul>
+</div></div>
+
+<div class="ms" id="m02"><div class="head"><h3>M02 · PostgreSQL、自定义 User、CI</h3><span class="tag codex">Codex</span><span class="tag">1.5h</span><span class="tag">≤ 150 行</span></div><div class="body">
+<h4>目标</h4><p>docker 起 PostgreSQL，项目连上并启用 pg_trgm；自定义 User；GitHub Actions 跑测试。</p>
+<h4>文件</h4>
+<ul>
+<li><code>docker-compose.yml</code>：服务 <code>db</code>，镜像 postgres:16，用户 / 密码 / 库名均为 <code>tpdc</code>，端口 5432，数据卷</li>
+<li><code>apps/users/</code>：<code>models.py</code> 的 <code>class User(AbstractUser)</code>；<code>admin.py</code> 注册；迁移 0001</li>
+<li><code>apps/core/migrations/0001_trigram.py</code>：<code>TrigramExtension()</code>，用 <code>RunPython</code> 包一层，在 <code>connection.vendor != "postgresql"</code> 时跳过</li>
+<li><code>config/settings/base.py</code>：<code>AUTH_USER_MODEL = "users.User"</code>，<code>django_q</code> 加入 INSTALLED_APPS 与 <code>Q_CLUSTER</code>；test.py 里 <code>Q_CLUSTER["sync"] = True</code></li>
+<li><code>.github/workflows/ci.yml</code>：架构文档第 11 节内容</li>
+<li><code>apps/users/tests/test_user.py</code>：创建用户与超级用户</li>
+</ul>
+<h4>验收</h4>
+<pre><code>docker compose up -d db &amp;&amp; sleep 5
+# .env 中 DATABASE_URL=postgres://tpdc:tpdc@localhost:5432/tpdc
+python manage.py migrate
+python manage.py shell -c "from django.db import connection; c=connection.cursor(); c.execute(\"select extname from pg_extension where extname='pg_trgm'\"); print(c.fetchone())"   # ('pg_trgm',)
+python manage.py createsuperuser --noinput --username admin --email a@b.c   # 配 DJANGO_SUPERUSER_PASSWORD
+pytest -q                            # 全部通过
+git commit -am "feat(users): custom user, postgres compose, CI (M02)" &amp;&amp; git tag M02</code></pre>
+<h4>审核清单</h4>
+<ul><li>推送后 GitHub Actions 绿色。</li><li>删除 DATABASE_URL 后 <code>pytest -q</code> 在 SQLite 下依然通过。</li><li>User 模型迁移是 users app 的 0001，且在任何依赖 auth 的迁移之前。</li></ul>
+</div></div>
+
+<div class="ms" id="m03"><div class="head"><h3>M03 · 编号归一化服务</h3><span class="tag opus">Opus</span><span class="tag">2h</span><span class="tag">≤ 200 行</span></div><div class="body">
+<h4>目标</h4><p>纯 Python、无模型依赖的归一化与输入类型识别，覆盖数据字典第 10 节的所有脏格式。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/catalog/__init__.py</code>、<code>apps/catalog/apps.py</code>（先建 app 壳，models 在 M04）</li>
+<li><code>apps/catalog/services/__init__.py</code>、<code>apps/catalog/services/normalize.py</code>：<code>normalize_number</code>、<code>split_numbers</code>（一格多号拆分）、<code>detect_query_kind</code>、<code>brand_hint</code>（按数据字典第 9 节的规律返回品牌候选列表）、<code>BRAND_ALIASES</code> 与 <code>canonical_brand</code></li>
+<li><code>apps/catalog/tests/test_normalize.py</code>：参数化覆盖全角、分隔符、大小写、前导 0、一格多号、空值、纯中文；detect_query_kind 的 sku / number / text 各 3 例；brand_hint 每种格式 1 例</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/catalog/tests/test_normalize.py    # ≥ 30 passed
+ruff check .
+git commit -am "feat(catalog): part number normalization service (M03)" &amp;&amp; git tag M03</code></pre>
+<h4>审核清单</h4>
+<ul><li><code>normalize_number("0 986 424 813") == "0986424813"</code>，前导 0 保留。</li><li>函数不导入任何 Django 模型。</li><li><code>brand_hint</code> 返回列表而非单值，且允许为空。</li></ul>
+</div></div>
+
+<div class="ms" id="m04"><div class="head"><h3>M04 · catalog 数据模型</h3><span class="tag codex">Sonnet</span><span class="tag">3h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>按架构文档第 6 节与数据字典第 2–6、8 节建立 Category、Brand、Part、PartNumber、Fitment、PartImage，含约束、索引与 QuerySet。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/catalog/models.py</code>：全部字段、<code>Meta.constraints</code>、<code>db_default</code>、<code>PartNumber.save()</code> 调用 normalize 写 number_norm、<code>PartImage</code> 上传路径函数与主图唯一逻辑</li>
+<li><code>apps/catalog/managers.py</code>：<code>PartQuerySet</code>（<code>published</code>、<code>reviewed</code>、<code>missing(item)</code>、<code>with_related</code>）、<code>PartNumberQuerySet</code>（<code>of_kind</code>）</li>
+<li><code>apps/catalog/schemas.py</code>：pydantic 的 <code>AttributeSchema</code>、<code>Packaging</code>，用于 JSONField 校验（在 <code>clean()</code> 中调用）</li>
+<li>迁移：模型 + 条件创建 GIN trigram 索引（<code>connection.vendor == "postgresql"</code> 时 <code>AddIndex</code>，否则空操作）</li>
+<li><code>apps/catalog/tests/factories.py</code>、<code>tests/test_models.py</code>：唯一约束触发、save 归一化、主图唯一、packaging 校验失败</li>
+</ul>
+<h4>验收</h4>
+<pre><code>python manage.py makemigrations --check --dry-run   # No changes detected
+python manage.py migrate
+pytest -q apps/catalog                               # 全部通过
+git commit -am "feat(catalog): core models, constraints, querysets (M04)" &amp;&amp; git tag M04</code></pre>
+<h4>审核清单</h4>
+<ul><li>PartNumber 唯一约束是 (number_norm, kind, brand)。</li><li>所有模型继承 TimeStampedModel；PartNumber、Fitment、PartImage、Part 继承 SourcedModel。</li><li>SQLite 下迁移不报错（trigram 索引被跳过）。</li><li><code>attributes</code> 与 <code>packaging</code> 用 <code>db_default=dict</code> 等价形式而非 <code>default={}</code>。</li></ul>
+</div></div>
+
+<div class="ms" id="m05"><div class="head"><h3>M05 · Django Admin 后台</h3><span class="tag codex">Codex</span><span class="tag">2h</span><span class="tag">≤ 200 行</span></div><div class="body">
+<h4>目标</h4><p>后台能搜索、筛选、内联编辑全部 catalog 模型。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/catalog/admin.py</code>：PartAdmin 带 PartNumber / Fitment / PartImage 三个 TabularInline；<code>search_fields</code> 含 sku、name_en、numbers__number_norm；<code>list_filter</code> 状态、分类、来源；<code>list_select_related</code>；<code>@admin.display</code> 显示完整度徽标与主图缩略；<code>autocomplete_fields</code> 用于 category、brand</li>
+<li>Category、Brand 的简单 Admin；PartNumber 独立 Admin 便于按编号查</li>
+<li><code>apps/catalog/tests/test_admin.py</code>：changelist 与 change 页 200</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/catalog
+python manage.py runserver   # 浏览 /admin/catalog/part/，搜索、筛选、内联编辑正常
+git commit -am "feat(catalog): admin with inlines and search (M05)" &amp;&amp; git tag M05</code></pre>
+<h4>审核清单</h4>
+<ul><li>产品列表页 SQL 条数不随行数增长（用 debug-toolbar 看）。</li><li>搜索 <code>2044-3906</code> 能找到 number 为 <code>20443906</code> 的产品（搜索前做归一化，需覆写 <code>get_search_results</code>）。</li></ul>
+</div></div>
+
+<div class="ms" id="m06"><div class="head"><h3>M06 · 演示数据生成</h3><span class="tag codex">Codex</span><span class="tag">3h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>一条命令生成符合数据字典第 12 节规范的合成数据与乱格式 Excel。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/catalog/management/commands/seed_demo.py</code>：<code>--reset</code> 清空后重建；固定随机种子保证可复现；分类树与 attribute_schema 按数据字典第 6 节；品牌与编号格式按第 9 节；脏数据比例按第 12 节；占位图用 Pillow 生成</li>
+<li><code>scripts/make_supplier_excel.py</code>：生成 <code>media/demo/supplier_quote_messy.xlsx</code>，可被 seed_demo 调用</li>
+<li><code>apps/catalog/tests/test_seed.py</code>：调用命令后断言数量区间与脏数据存在（例如至少一条 number 含横杠、至少一组重复）</li>
+</ul>
+<h4>验收</h4>
+<pre><code>python manage.py seed_demo --reset
+python manage.py shell -c "from apps.catalog.models import *; print(Part.objects.count(), PartNumber.objects.count(), Fitment.objects.count())"   # 约 400 / 1200 / 600
+ls media/demo/supplier_quote_messy.xlsx
+pytest -q apps/catalog
+git commit -am "feat(catalog): seed_demo with messy data and supplier excel (M06)" &amp;&amp; git tag M06</code></pre>
+<h4>审核清单</h4>
+<ul><li>两次运行 <code>--reset</code> 得到相同数据（固定种子）。</li><li>页脚与 README 有"演示数据，非真实 OE 号"声明。</li><li>供应商报价（SupplierOffer）部分留到 M09 补充，本里程碑不建 suppliers 模型。</li></ul>
+</div></div>
+
+<div class="ms" id="m07"><div class="head"><h3>M07 · 三级匹配服务</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>实现架构文档 7.2 的 <code>search</code> 与 <code>alternatives</code>，PostgreSQL 用 trigram，SQLite 用 difflib 回退。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/catalog/services/matcher.py</code>：<code>Candidate</code> 数据类、<code>search</code>、<code>alternatives</code>、<code>_exact</code>、<code>_prefix</code>、<code>_fuzzy</code>、<code>_by_name</code>、排序与去重</li>
+<li><code>apps/catalog/tests/test_matcher.py</code>：精确、归一化、前缀后缀变体、模糊（少一位、多一位、O/0 混淆）、名称 + 车型、SKU 前缀查询、替代件、结果上限、排序稳定；trigram 相关用例打 <code>@pytest.mark.postgres</code></li>
+<li><code>pyproject.toml</code> 注册 marker；<code>conftest.py</code> 在非 PostgreSQL 时自动 skip</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/catalog/tests/test_matcher.py           # PostgreSQL 下全部通过
+DATABASE_URL= pytest -q apps/catalog/tests/test_matcher.py   # SQLite 下 postgres 用例 skipped，其余通过
+python manage.py shell -c "from apps.catalog.services.matcher import search; [print(c.match_type, c.score, c.part.sku) for c in search('2044-3906')[:5]]"
+git commit -am "feat(catalog): three-level matcher with trigram and fallback (M07)" &amp;&amp; git tag M07</code></pre>
+<h4>审核清单</h4>
+<ul><li>精确命中且唯一时不执行模糊查询（用 <code>django_assert_num_queries</code> 或日志验证）。</li><li>模糊阈值、结果上限是模块常量，不散落在函数内。</li><li><code>alternatives</code> 排除自身，且只用一条查询。</li><li>输入为空或全是符号时返回空列表而非异常。</li></ul>
+</div></div>
+
+<div class="ms" id="m08"><div class="head"><h3>M08 · 智能查询页与产品详情页</h3><span class="tag codex">Sonnet</span><span class="tag">3h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>销售可用的搜索页与产品卡片，HTMX 即时刷新。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/catalog/views.py</code>：<code>SearchView</code>（GET q；<code>request.htmx</code> 时只渲染 <code>partials/search_results.html</code>）、<code>PartDetailView</code>（<code>with_related</code> 预取；替代件）</li>
+<li><code>apps/catalog/urls.py</code>，<code>config/urls.py</code> 挂载 <code>/search/</code> 与 <code>/parts/&lt;sku&gt;/</code></li>
+<li>模板：<code>catalog/search.html</code>、<code>catalog/partials/search_results.html</code>、<code>catalog/partials/part_card.html</code>、<code>catalog/part_detail.html</code>；匹配类型用不同颜色标签；卡片显示主图、名称、分类、OE / Cross 列表、适配、完整度；供应商成本与建议售价区域先留占位（M09 后填充）</li>
+<li><code>apps/catalog/tests/test_views.py</code>：搜索页 200、HTMX 局部返回不含 <code>&lt;html&gt;</code>、详情页 200、SQL 条数上限 8</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/catalog
+python manage.py runserver   # /search/?q=2044-3906 秒出结果；输入框每次按键 300ms 防抖后刷新
+git commit -am "feat(catalog): search page and part detail with HTMX (M08)" &amp;&amp; git tag M08</code></pre>
+<h4>审核清单</h4>
+<ul><li>视图不含业务逻辑，只调用 matcher 与 QuerySet。</li><li>搜索结果页在 20 条结果下 SQL ≤ 8 条。</li><li>页面在手机宽度可读。</li></ul>
+</div></div>
+
+<div class="ms" id="m09"><div class="head"><h3>M09 · suppliers 供应商与报价</h3><span class="tag codex">Codex</span><span class="tag">2h</span><span class="tag">≤ 250 行</span></div><div class="body">
+<h4>目标</h4><p>Supplier 与 SupplierOffer 模型、Admin、报价服务，seed 补充报价数据，产品页显示成本与建议售价。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/suppliers/models.py</code>（数据字典第 7 节）、<code>admin.py</code>、迁移</li>
+<li><code>apps/suppliers/services/quoting.py</code>：<code>best_offer</code>、<code>suggested_price</code>（成本 × (1 + DEFAULT_MARGIN)）</li>
+<li><code>apps/catalog/managers.py</code> 增加 <code>with_min_cost()</code>（Subquery 注解）；seed_demo 扩展生成约 500 条报价；产品卡片与详情页填充成本区域</li>
+<li><code>apps/suppliers/tests/</code>：best_offer 同价取交期短、suggested_price 取整</li>
+</ul>
+<h4>验收</h4>
+<pre><code>python manage.py migrate &amp;&amp; python manage.py seed_demo --reset
+pytest -q
+git commit -am "feat(suppliers): supplier offers and quoting service (M09)" &amp;&amp; git tag M09</code></pre>
+<h4>审核清单</h4>
+<ul><li>SupplierOffer 唯一约束 (supplier, part, quoted_at)。</li><li>成本显示受 <code>can_view_cost</code> 上下文变量控制（MVP 恒为 True，但模板已用它包裹）。</li></ul>
+</div></div>
+
+<div class="ms" id="m10"><div class="head"><h3>M10 · 数据完整度评分</h3><span class="tag codex">Sonnet</span><span class="tag">2h</span><span class="tag">≤ 200 行</span></div><div class="body">
+<h4>目标</h4><p>架构文档 7.3 的 quality 服务与全量重算命令。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/catalog/services/quality.py</code>：<code>WEIGHTS</code> 常量、<code>evaluate</code>、<code>recompute</code>（批量，用 <code>bulk_update</code>）、<code>summary</code>、<code>duplicates</code></li>
+<li><code>apps/catalog/management/commands/recompute_quality.py</code></li>
+<li>seed_demo 结束时调用 recompute；Admin 保存 Part 后重算该条</li>
+<li><code>tests/test_quality.py</code>：每个权重项各一例、满分例、summary 分布、duplicates 检出 seed 的 10 组</li>
+</ul>
+<h4>验收</h4>
+<pre><code>python manage.py recompute_quality      # 输出 "recomputed 4xx parts"
+pytest -q apps/catalog
+git commit -am "feat(catalog): completeness scoring and recompute command (M10)" &amp;&amp; git tag M10</code></pre>
+<h4>审核清单</h4>
+<ul><li>权重总和为 100 且有测试断言。</li><li>recompute 对 400 条 SQL 条数固定（预取 + bulk_update），不是逐条 save。</li></ul>
+</div></div>
+
+<div class="ms" id="m11"><div class="head"><h3>M11 · 数据质量看板</h3><span class="tag codex">Sonnet</span><span class="tag">2.5h</span><span class="tag">≤ 250 行</span></div><div class="body">
+<h4>目标</h4><p>PRD F2 的看板页：统计卡片、分布、缺失项下钻、疑似重复。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/core/views.py</code>：<code>QualityDashboardView</code>；<code>apps/catalog/views.py</code>：<code>PartListView</code> 支持 <code>?missing=image</code> 等筛选（复用 QuerySet.missing）</li>
+<li>模板 <code>core/quality.html</code>、<code>catalog/part_list.html</code>；分布用纯 CSS 条形（不引入图表库）</li>
+<li>测试：看板 200、各下钻链接 200 且数量与 summary 一致</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q
+python manage.py runserver   # /quality/ 数字可点击进入列表
+git commit -am "feat(core): data quality dashboard with drill-down (M11)" &amp;&amp; git tag M11</code></pre>
+<h4>审核清单</h4>
+<ul><li>看板 SQL 条数固定（summary 用聚合，不在模板里循环查）。</li><li>疑似重复列表每组可跳到两个 SKU 的后台页。</li></ul>
+</div></div>
+
+<div class="ms" id="m12"><div class="head"><h3>M12 · importer 上传与预览</h3><span class="tag codex">Sonnet</span><span class="tag">3h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>导入向导前两步：上传文件、定位表头、预览前 20 行。映射与执行在 M14。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/importer/models.py</code>：ImportBatch（file、supplier、status、column_mapping、stats、created_by）、ImportRow（batch、row_no、raw、result、message）</li>
+<li><code>apps/importer/services/loader.py</code>：<code>read_table</code>（pandas + openpyxl，<code>dtype=str</code>，表头定位规则，去空行，csv 编码探测 utf-8 / gbk）</li>
+<li><code>apps/importer/forms.py</code>：文件类型与大小校验；<code>views.py</code>：<code>UploadView</code>、<code>PreviewView</code>；模板 <code>importer/upload.html</code>、<code>importer/preview.html</code>；Admin 注册两模型</li>
+<li>测试：用 seed 生成的乱格式 Excel 读取，表头定位到第 3 行，列名正确，前导 0 保留；gbk csv 可读；超大文件被拒</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/importer
+python manage.py runserver   # /import/ 上传 media/demo/supplier_quote_messy.xlsx，预览正确
+git commit -am "feat(importer): upload, header detection and preview (M12)" &amp;&amp; git tag M12</code></pre>
+<h4>审核清单</h4>
+<ul><li>所有列以字符串读取，科学计数不会出现。</li><li>上传文件保存到 <code>media/imports/&lt;uuid&gt;.xlsx</code>，不使用原文件名。</li></ul>
+</div></div>
+
+<div class="ms" id="m13"><div class="head"><h3>M13 · LLM 封装、mock 与调用审计</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>架构文档 7.4 的 ai app：接口、OpenAI 兼容实现、mock、工厂、提示词加载、AITask 审计。四个提示词文件与示例输出就位。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/ai/models.py</code>：AITask；<code>admin.py</code></li>
+<li><code>apps/ai/llm/{base,openai_compat,mock,factory}.py</code>；<code>apps/ai/prompts/loader.py</code>；<code>apps/ai/prompts/{column_mapping,extract_fields,enrich_part,image_identify}.md</code> 与对应 <code>.example.json</code>（内容取自架构文档附录 A）</li>
+<li><code>apps/ai/schemas.py</code>：pydantic 的 <code>MappingResult</code>、<code>ExtractResult</code>、<code>EnrichResult</code>、<code>ImageFinding</code></li>
+<li>测试：mock 客户端四个提示词各返回可校验对象并写 AITask；openai_compat 用 monkeypatch 伪造 <code>chat.completions.create</code>，覆盖正常、JSON 损坏后重试成功、两次失败标 invalid_json、超时异常标 error；prompts 的变量占位全部能被填充（缺变量时抛 KeyError 的测试）</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/ai
+LLM_PROVIDER=mock python manage.py shell -c "from apps.ai.llm.factory import get_client; from apps.ai.schemas import EnrichResult; r,t=get_client().extract_json(prompt_name='enrich_part', variables={...}, schema=EnrichResult); print(r.title_en, t.status)"
+# 有真实 key 时：LLM_PROVIDER=openai_compatible 重复上一条，t.model 应为配置的模型名
+git commit -am "feat(ai): LLM client abstraction, mock provider, prompt loader, audit (M13)" &amp;&amp; git tag M13</code></pre>
+<h4>审核清单</h4>
+<ul><li>业务代码只 import <code>factory.get_client</code>，不直接 import openai。</li><li>AITask 不存完整输入，只存 digest 与前 500 字预览；不含成本价与客户信息。</li><li>提示词正文里有"不要编造编号"。</li><li>失败路径不抛异常到调用方以外（返回 status 而非 raise），或统一抛自定义 <code>LLMError</code> 由调用方处理，二选一并在 base.py 注明。</li></ul>
+</div></div>
+
+<div class="ms" id="m14"><div class="head"><h3>M14 · 列映射与导入执行</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>导入向导后两步：映射建议（同义词 + AI）、预检、事务导入、结果页。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/importer/services/mapping.py</code>：<code>SYNONYMS</code>（数据字典第 11 节）、<code>suggest_mapping</code></li>
+<li><code>apps/importer/services/loader.py</code> 增加 <code>dry_run</code>、<code>execute</code>：拆分一格多号、品牌别名、kind 判定、单位换算、更新规则（verified 不覆盖、以新补空）、ImportRow 写入、疑似重复标记、结束调用 quality.recompute</li>
+<li><code>views.py</code>：<code>MappingView</code>（HTMX 表格，可改每列目标字段）、<code>DryRunView</code>、<code>ExecuteView</code>、<code>ResultView</code>；模板四个</li>
+<li>测试：同义词命中不调用 LLM（mock 计数为 0）、未命中列调用一次；dry_run 对乱格式 Excel 得到预期的新增 / 更新 / 跳过 / 无效数量；execute 后 PartNumber 与 SupplierOffer 数量正确；人为制造一行异常时整批回滚；verified 编号不被覆盖</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/importer
+python manage.py runserver   # 完整走一遍：上传 → 映射（改一列）→ 预检 → 导入 → 结果；看板数字变化
+git commit -am "feat(importer): column mapping, dry-run and transactional import (M14)" &amp;&amp; git tag M14</code></pre>
+<h4>审核清单</h4>
+<ul><li><code>execute</code> 整体在 <code>transaction.atomic()</code> 内。</li><li>映射建议表格每行显示来源（synonym / ai）与置信度。</li><li>无效行原因是中文且具体（"缺少 OE 号且缺少供应商料号"）。</li></ul>
+</div></div>
+
+<div class="ms" id="m15"><div class="head"><h3>M15 · AI 补全与审核工作台</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>PRD F5：单个 SKU 的 AI 补全、AISuggestion、审核台采纳与拒绝。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/ai/models.py</code> 增加 AISuggestion（part、payload、status、confidence、ai_task、reviewed_by、reviewed_at、reason）与 <code>accept()</code> / <code>reject()</code> 方法</li>
+<li><code>apps/ai/services/enrich.py</code>：<code>build_context(part)</code>（含同类已审核样例 2 条）、<code>enrich_part(part) -&gt; AISuggestion</code></li>
+<li><code>views.py</code>：产品页"AI 补全"按钮（POST，HTMX 返回建议卡片）、<code>ReviewQueueView</code>、<code>SuggestionAcceptView</code>、<code>SuggestionRejectView</code>；模板 <code>ai/review_queue.html</code>、<code>ai/partials/suggestion.html</code>（当前值 vs 建议值两栏）</li>
+<li>测试：mock 下生成建议、accept 写回并标 source=ai 且重算完整度、reject 记录原因、已 verified 字段不被 accept 覆盖</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/ai
+python manage.py runserver   # 产品页点"AI 补全" → /ai/review/ 采纳 → 产品描述更新，来源显示 AI
+git commit -am "feat(ai): part enrichment suggestions and review queue (M15)" &amp;&amp; git tag M15</code></pre>
+<h4>审核清单</h4>
+<ul><li><code>grep -rn "source=.ai" apps/</code> 只在 <code>AISuggestion.accept</code> 中出现。</li><li>采纳是逐字段的：用户可以只采纳标题不采纳分类（payload 的字段级勾选）。</li></ul>
+</div></div>
+
+<div class="ms" id="m16"><div class="head"><h3>M16 · 后台批量任务</h3><span class="tag codex">Sonnet</span><span class="tag">2h</span><span class="tag">≤ 200 行</span></div><div class="body">
+<h4>目标</h4><p>批量 AI 补全与大文件导入走 django-q2，页面显示进度。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/ai/tasks.py</code>：<code>enrich_parts(part_ids)</code> 逐条调用 enrich_part，单条失败记录不中断；<code>apps/importer/tasks.py</code>：<code>execute_batch(batch_id)</code></li>
+<li>产品列表多选 → "批量补全"按钮；<code>apps/core/views.py</code> 的 <code>TaskStatusView</code>（按 django_q 的 Task 表查状态）；HTMX 每 2 秒轮询的进度局部模板</li>
+<li>导入行数 &gt; 500 时 ExecuteView 改为投递任务</li>
+<li>测试：test 设置下 <code>sync=True</code>，投递后立即完成并产生 N 条建议</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q
+python manage.py qcluster &amp;   # 另开终端
+python manage.py runserver    # 多选 20 个 SKU 批量补全，进度条走完，审核台出现 20 条
+git commit -am "feat: background batch tasks with django-q2 (M16)" &amp;&amp; git tag M16</code></pre>
+<h4>审核清单</h4>
+<ul><li>任务函数只接收 id 列表，不接收模型实例。</li><li>qcluster 未启动时页面提示"后台任务未运行"而不是无限等待。</li></ul>
+</div></div>
+
+<div class="ms" id="m17"><div class="head"><h3>M17 · 图片询价</h3><span class="tag opus">Opus</span><span class="tag">3.5h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>PRD F4：上传照片 → 视觉模型识别 → 复用匹配 → 候选确认。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/inquiries/models.py</code>：Inquiry（raw_input、input_type、image、finding JSON、matched_part、status、created_by）；迁移；Admin</li>
+<li><code>apps/inquiries/services/image_inquiry.py</code>：<code>prepare_image</code>（Pillow 校验、压缩到长边 1280）、<code>identify(inquiry)</code>（调用 describe_image）、<code>candidates(finding)</code>（对 visible_numbers 逐个 search，无编号时按 part_type + brand_hints 名称检索，合并去重）</li>
+<li><code>views.py</code>：<code>ImageInquiryView</code>（上传 + 结果）、<code>InquiryConfirmView</code>（点选候选写 matched_part）；模板</li>
+<li>测试：mock 下识别结果落库、候选包含 seed 中对应 SKU、非图片文件被拒、无编号时走名称检索</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/inquiries
+LLM_PROVIDER=mock python manage.py runserver   # /inquiry/image/ 上传任意 jpg，返回演示识别结果与候选
+# 有视觉模型 key 时用一张真实刹车片照片验证 visible_numbers 非空
+git commit -am "feat(inquiries): image inquiry with vision model and matcher reuse (M17)" &amp;&amp; git tag M17</code></pre>
+<h4>审核清单</h4>
+<ul><li>送模型的是压缩后的图片而不是原图。</li><li>mock 模式页面有"演示模式"标识。</li><li>候选全部标"待确认"，确认前 matched_part 为空。</li></ul>
+</div></div>
+
+<div class="ms" id="m18"><div class="head"><h3>M18 · 询价留痕与一键报价单</h3><span class="tag codex">Sonnet</span><span class="tag">3h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>PRD F6、F7：文本搜索自动留痕、询价记录页与未命中榜、报价单生成与 Excel 导出。</p>
+<h4>文件</h4>
+<ul>
+<li>SearchView 每次非空查询创建 Inquiry(input_type=text)，命中首位写 matched_part（可被用户改）</li>
+<li><code>apps/inquiries/models.py</code> 增加 QuoteLine；<code>services/quoting.py</code> 的 <code>build_quote</code> 与 <code>quote_to_xlsx</code>（openpyxl，含图片、描述、规格、包装、替代件、供应商信息列）</li>
+<li><code>views.py</code>：<code>InquiryListView</code>（筛选 + 未命中榜）、<code>QuoteView</code>（表单：数量、毛利；生成 + 下载）；模板</li>
+<li>测试：搜索后 Inquiry +1；未命中榜统计正确；报价单价 = 成本 × 1.25 四舍五入；qty &lt; moq 有提示；xlsx 可被 openpyxl 重新打开且行数正确</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/inquiries
+python manage.py runserver   # 搜索几次 → /inquiry/ 有记录 → 生成报价单 → 下载 xlsx 打开正常
+git commit -am "feat(inquiries): inquiry logging and one-click quotation (M18)" &amp;&amp; git tag M18</code></pre>
+<h4>审核清单</h4>
+<ul><li>留痕不影响搜索响应（写入在返回前一次 create，无额外查询）。</li><li>报价 Decimal 运算，不用 float。</li></ul>
+</div></div>
+
+<div class="ms" id="m19"><div class="head"><h3>M19 · 平台上架导出</h3><span class="tag codex">Codex</span><span class="tag">2h</span><span class="tag">≤ 200 行</span></div><div class="body">
+<h4>目标</h4><p>PRD F8：多选 SKU 导出 Alibaba 与 Shopify CSV，排除未审核或缺主图的 SKU 并说明原因。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/inquiries/services/export.py</code>：两个平台的列定义常量、<code>to_alibaba_csv</code>、<code>to_shopify_csv</code>、<code>eligible(parts)</code> 返回 (可导出, 排除原因列表)</li>
+<li>产品列表多选 → 导出下拉；<code>ExportView</code> 返回 CSV 附件并在 flash 消息列出被排除项</li>
+<li>测试：已审核 + 有图导出成功；draft 被排除且原因正确；CSV 用 utf-8-sig 编码，Excel 打开不乱码</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/inquiries
+python manage.py runserver   # 多选导出，用 Excel 打开中文不乱码
+git commit -am "feat(inquiries): Alibaba and Shopify listing export (M19)" &amp;&amp; git tag M19</code></pre>
+<h4>审核清单</h4>
+<ul><li>列定义是常量列表，改模板不用改逻辑。</li><li>描述字段的换行与逗号被正确转义。</li></ul>
+</div></div>
+
+<div class="ms" id="m20"><div class="head"><h3>M20 · 首页仪表盘、README、演示脚本</h3><span class="tag codex">Sonnet</span><span class="tag">3h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>首页把搜索框、看板摘要、待审核数、最近询价放在一屏；README 完整；演示脚本与一键启动脚本；截图放入 docs。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/core/views.py</code> 的 <code>HomeView</code> 与模板 <code>core/home.html</code></li>
+<li><code>README.md</code>：简介、截图、安装、环境变量、seed、运行、测试、目录说明、指向 docs/</li>
+<li><code>docs/DEMO_SCRIPT.md</code>（PRD 第 10 节的操作版，含每一步要输入的值）、<code>scripts/demo_up.sh</code>（起 db、migrate、seed、runserver + qcluster）</li>
+<li><code>docs/screenshots/</code> 五张关键页面截图；<code>docs/index.html</code> 进度表全部更新</li>
+<li>全站走查修 UI 细节（不新增功能）</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q &amp;&amp; ruff check .
+bash scripts/demo_up.sh      # 全新环境一条命令到可演示
+# 按 docs/DEMO_SCRIPT.md 走一遍五个场景，全部通过
+git commit -am "feat(core): home dashboard, README, demo script (M20)" &amp;&amp; git tag M20</code></pre>
+<h4>审核清单</h4>
+<ul><li>断网 + mock 模式下五个场景仍可走通。</li><li>README 中的命令逐条可复制执行。</li></ul>
+</div></div>
+
+<h2 id="handoff">交接说明：给接手模型</h2>
+<p>项目根目录的 <code>AGENTS.md</code> 与 <code>CLAUDE.md</code> 内容相同，在 M01 创建，全文如下：</p>
+<pre><code># 施工约定
+
+本仓库按里程碑施工，每个里程碑一次提交、一次人工审核。开始任何工作前：
+
+1. 阅读 docs/schedule.html，找到用户指定的里程碑（未指定时取 docs/index.html 进度表中第一个"未开始"）。
+2. 阅读 docs/architecture.html 与 docs/data-dictionary.html 中与该里程碑相关的章节；验收标准见 docs/prd.html。
+3. 只实现该里程碑列出的文件与要求。不提前做后续里程碑的内容，不引入清单外的依赖，不重构无关代码。
+4. 发现文档遗漏、冲突或与已有代码不一致时，先在回复中说明并给出建议，等用户确认后再动手。
+5. 完成后运行该里程碑的全部验收命令，输出原样贴给用户。任何一条失败都不得提交。
+6. 通过后按 Conventional Commits 提交（信息含里程碑编号），打轻量标签 M&lt;编号&gt;，并更新 docs/index.html 进度表该行的状态与 commit 短哈希。
+7. 停下，向用户报告：改动文件清单、验收输出、建议重点审核的地方。不要继续下一个里程碑。
+
+技术约定：Python 3.12，Django 5.2，PostgreSQL 16（DATABASE_URL 未设时 SQLite），ruff，pytest。
+settings 在 config/settings/ 分层；业务逻辑放 services 与 QuerySet，视图保持薄；
+所有 AI 调用经 apps/ai/llm/factory.get_client()；AI 产出只能通过 AISuggestion.accept() 写入业务字段。
+界面中文，字段英文，USD 单币种。演示数据均为合成，页脚保留声明。
+</code></pre>
+<h3>驱动提示词模板</h3>
+<p>每次让模型执行一个里程碑时，直接发送下面这段（替换编号）：</p>
+<pre><code>请阅读仓库根目录的 AGENTS.md（Claude 读 CLAUDE.md）和 docs/schedule.html，执行里程碑 M07。
+要求：
+- 只做 M07 清单列出的内容；
+- 完成后运行 M07 的全部验收命令，把输出原样贴给我；
+- 全部通过后按约定提交并打标签 M07，更新 docs/index.html 进度表；
+- 然后停下等我审核，不要开始 M08。
+如果 M07 的要求与已有代码或文档冲突，先说明并给出建议，不要自行扩大范围。
+</code></pre>
+<h3>换模型时的注意事项</h3>
+<ul>
+<li>新模型的第一条消息就用上面的模板，不需要复述之前的对话。所有决策都在 docs/ 里。</li>
+<li>换模型后的第一个里程碑，审核时多看一眼命名与目录是否遵守架构文档第 4 节，避免风格漂移。</li>
+<li>Codex 读 <code>AGENTS.md</code>，Claude 读 <code>CLAUDE.md</code>；两者内容保持一致，改一个就同步另一个。</li>
+<li>额度紧张时，标注 Codex / Sonnet 的里程碑用便宜模型；标注 Opus 的里程碑涉及判断与取舍，不建议降级。</li>
+</ul>
+
+<h2 id="review">审核流程：给项目作者</h2>
+<ol>
+<li><b>看增量。</b><code>git show --stat M07</code> 看改了哪些文件；<code>git diff M06..M07</code> 看内容。文件超出里程碑清单的要问为什么。</li>
+<li><b>跑验收。</b>把里程碑的验收命令自己再跑一遍，尤其是 <code>pytest -q</code> 与 <code>ruff check .</code>。</li>
+<li><b>过清单。</b>逐条核对该里程碑的"审核清单"，每条都能用 grep、页面点击或一条 shell 命令验证。</li>
+<li><b>看测试。</b>测试文件是否真的覆盖了清单里的情形；有没有"永远通过"的空测试。</li>
+<li><b>提修改。</b>把问题列给模型，要求以 <code>fix(scope): ... (M07)</code> 独立提交，不改写历史；修完再看一次 diff。</li>
+<li><b>更新进度。</b>确认 <code>docs/index.html</code> 该行状态已改。</li>
+</ol>
+<p>每个里程碑的审核预计 15–30 分钟。若某个里程碑 diff 超过 400 行，可以要求模型拆成两次提交（例如 M14a 映射、M14b 执行）。</p>
+</main>
+<footer class="site">施工进度表 v1.0 · 每个里程碑一次提交、一次审核。</footer>
+</body>
+</html>

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>标准字段规范 · 卡车配件 AI 产品数据中心</title>
+<meta name="description" content="卡车配件产品数据的标准字段规范：字段定义、格式规则、必填级别、脏数据与清洗规则、品牌 OE 号格式、供应商表头同义词表。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a href="prd.html">PRD</a>
+    <a href="architecture.html">架构设计</a>
+    <a class="active" href="data-dictionary.html">数据字典</a>
+    <a href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>标准字段规范（数据字典）</h1>
+<p class="lede">供应商的 Excel、PDF、图片与网页资料，最终都要落到这里定义的字段上。这份规范同时是导入映射、完整度评分、AI 提示词与平台导出的共同依据。</p>
+<p class="meta">版本 v1.0 · 2026-09-18 · 适用于 catalog / suppliers / importer 三个 app</p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#s1">使用说明</a></li>
+<li><a href="#s2">Part 产品主数据</a></li>
+<li><a href="#s3">PartNumber 编号</a></li>
+<li><a href="#s4">Fitment 适配车型</a></li>
+<li><a href="#s5">Packaging 包装</a></li>
+<li><a href="#s6">Category 与 attribute_schema</a></li>
+<li><a href="#s7">SupplierOffer 供应商报价</a></li>
+<li><a href="#s8">PartImage 图片</a></li>
+<li><a href="#s9">品牌编号格式规律</a></li>
+<li><a href="#s10">常见脏数据与清洗规则</a></li>
+<li><a href="#s11">供应商表头同义词表</a></li>
+<li><a href="#s12">合成演示数据规范</a></li>
+</ol></div>
+
+<h2 id="s1">1. 使用说明</h2>
+<div class="tbl"><table>
+<tr><th>必填级别</th><th>含义</th><th>对完整度的影响</th></tr>
+<tr><td><span class="tag must">必填</span></td><td>缺失则记录无效，导入时跳过并记录原因</td><td>无法入库</td></tr>
+<tr><td><span class="tag rec">推荐</span></td><td>可入库，但计入完整度缺失项</td><td>按权重扣分</td></tr>
+<tr><td><span class="tag">可选</span></td><td>锦上添花</td><td>不扣分</td></tr>
+</table></div>
+<p><b>来源优先级</b>（同一字段多来源冲突时）：人工确认（verified）&gt; 人工录入（manual）&gt; 供应商文件导入（import）&gt; AI 建议（ai）。低优先级来源不覆盖高优先级已有值，只补空。</p>
+<p><b>命名约定</b>：数据库与代码使用英文 snake_case；界面显示中文；导出到平台时按平台模板改名。</p>
+
+<h2 id="s2">2. Part 产品主数据</h2>
+<div class="tbl"><table>
+<tr><th>字段</th><th>中文</th><th>类型</th><th>级别</th><th>格式规则</th><th>示例</th><th>常见脏数据</th><th>清洗规则</th></tr>
+<tr><td><code>sku</code></td><td>内部料号</td><td>char(32) 唯一</td><td><span class="tag must">必填</span></td><td><code>FIT-&lt;类别3字母&gt;-&lt;5位数字&gt;</code>；导入无 sku 时由系统按分类生成</td><td><code>FIT-BRK-00123</code></td><td>小写、多余空格、供应商料号被当作 sku</td><td>大写、去空白；不符合前缀规则的值转存为 supplier_pn</td></tr>
+<tr><td><code>name_en</code></td><td>英文品名</td><td>char(200)</td><td><span class="tag rec">推荐</span></td><td>通用零件名 + 关键限定词，首字母大写，不含编号</td><td><code>Brake Pad Set, Front Axle</code></td><td>全大写、夹杂编号、中英混排</td><td>Title Case；剥离编号到 PartNumber；中文部分移到 name_zh</td></tr>
+<tr><td><code>name_zh</code></td><td>中文品名</td><td>char(200)</td><td><span class="tag">可选</span></td><td>行业通用名</td><td>前刹车片</td><td>繁体、错别字</td><td>转简体</td></tr>
+<tr><td><code>category</code></td><td>分类</td><td>FK Category</td><td><span class="tag rec">推荐</span></td><td>二级分类树中的叶子</td><td>制动系统 / 刹车片</td><td>供应商自定义分类名</td><td>同义词表映射；未命中交 AI 建议，进待审核</td></tr>
+<tr><td><code>attributes</code></td><td>规格属性</td><td>JSON</td><td><span class="tag rec">推荐</span></td><td>键由 category.attribute_schema 定义；数值统一单位（mm、kg、L）</td><td><code>{"length_mm":210,"width_mm":93,"thickness_mm":30,"friction_material":"semi-metallic"}</code></td><td>带单位的字符串 "210mm"、英寸、范围值 "30-32"</td><td>解析数值与单位并换算；范围取下限并在 notes 保留原文</td></tr>
+<tr><td><code>description_en</code></td><td>英文描述</td><td>text</td><td><span class="tag rec">推荐</span></td><td>120–200 词，无编号堆砌</td><td>—</td><td>复制的供应商广告语</td><td>由 AI 重写后审核</td></tr>
+<tr><td><code>keywords</code></td><td>关键词</td><td>JSON 数组</td><td><span class="tag">可选</span></td><td>8–12 个英文短语</td><td><code>["volvo brake pad","fh12 brake pad"]</code></td><td>逗号与分号混用</td><td>统一拆分、去重、小写</td></tr>
+<tr><td><code>packaging</code></td><td>包装</td><td>JSON</td><td><span class="tag rec">推荐</span></td><td>见第 5 节</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>status</code></td><td>状态</td><td>enum</td><td><span class="tag must">必填</span></td><td><code>draft</code> / <code>reviewed</code> / <code>published</code></td><td><code>draft</code></td><td>—</td><td>导入与 AI 产生的记录一律 draft</td></tr>
+<tr><td><code>completeness_score</code></td><td>完整度</td><td>int 0–100</td><td>系统</td><td>由 quality 服务计算</td><td>75</td><td>—</td><td>—</td></tr>
+<tr><td><code>source</code> / <code>confidence</code> / <code>verified</code></td><td>来源 / 置信度 / 已验证</td><td>enum / decimal / bool</td><td>系统</td><td>source ∈ manual, import, ai</td><td>import / 1.00 / false</td><td>—</td><td>—</td></tr>
+<tr><td><code>notes</code></td><td>备注</td><td>text</td><td><span class="tag">可选</span></td><td>保留清洗前原文与人工说明</td><td>—</td><td>—</td><td>—</td></tr>
+</table></div>
+
+<h2 id="s3">3. PartNumber 编号</h2>
+<div class="tbl"><table>
+<tr><th>字段</th><th>中文</th><th>类型</th><th>级别</th><th>格式规则</th><th>示例</th><th>常见脏数据</th><th>清洗规则</th></tr>
+<tr><td><code>part</code></td><td>所属 SKU</td><td>FK Part</td><td><span class="tag must">必填</span></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>number</code></td><td>编号原文</td><td>char(64)</td><td><span class="tag must">必填</span></td><td>保留供应商或车厂的书写格式</td><td><code>A 000 420 15 20</code></td><td>多个编号挤在一格（"20443906/20568713"、换行、中文顿号）</td><td>按 <code>/ , ; 、 换行 |</code> 拆分为多条</td></tr>
+<tr><td><code>number_norm</code></td><td>归一化编号</td><td>char(64) 索引</td><td>系统</td><td>去除所有非字母数字、转大写</td><td><code>A0004201520</code></td><td>—</td><td>由 normalize_number 生成，禁止手工填写</td></tr>
+<tr><td><code>kind</code></td><td>编号类型</td><td>enum</td><td><span class="tag must">必填</span></td><td><code>OE</code> 主机厂原厂号；<code>CROSS</code> 其他品牌互换号；<code>SUPPLIER</code> 供应商料号</td><td><code>OE</code></td><td>OE 与 Cross 混在同一列</td><td>按 brand 是否为整车厂判断；无法判断时按列映射默认值并标 confidence 0.6</td></tr>
+<tr><td><code>brand</code></td><td>编号所属品牌</td><td>FK Brand，可空</td><td><span class="tag rec">推荐</span></td><td>整车厂或零部件品牌</td><td>Volvo</td><td>拼写变体 "VOLVO"、"沃尔沃"、"Volvo Trucks"</td><td>品牌别名表归一</td></tr>
+<tr><td><code>source</code> / <code>confidence</code> / <code>verified</code></td><td>—</td><td>—</td><td>系统</td><td>AI 提取的编号 confidence ≤ 0.8 且 verified=false</td><td>—</td><td>—</td><td>—</td></tr>
+</table></div>
+<p><b>唯一约束</b>：(number_norm, kind, brand)。同号出现在多个 SKU 上不在库级阻止，进入疑似重复列表。</p>
+
+<h2 id="s4">4. Fitment 适配车型</h2>
+<div class="tbl"><table>
+<tr><th>字段</th><th>中文</th><th>类型</th><th>级别</th><th>格式规则</th><th>示例</th><th>常见脏数据</th><th>清洗规则</th></tr>
+<tr><td><code>make</code></td><td>品牌</td><td>char(50)</td><td><span class="tag must">必填</span></td><td>整车品牌，标准拼写</td><td>Volvo</td><td>"Volvo/Renault" 合并写</td><td>拆分为多条</td></tr>
+<tr><td><code>model</code></td><td>车系</td><td>char(50)</td><td><span class="tag rec">推荐</span></td><td>车厂官方车系名</td><td>FH12</td><td>"FH 12"、"FH-12"</td><td>去空格与横杠后与车系表匹配，保留官方写法</td></tr>
+<tr><td><code>engine</code></td><td>发动机</td><td>char(50)</td><td><span class="tag">可选</span></td><td>发动机型号</td><td>D12A</td><td>—</td><td>—</td></tr>
+<tr><td><code>year_from</code> / <code>year_to</code></td><td>年份范围</td><td>smallint</td><td><span class="tag">可选</span></td><td>四位年份；to 为空表示至今</td><td>1993 / 2005</td><td>"93-05"、"1993~"、"2005+"</td><td>两位年补世纪；开区间置空</td></tr>
+<tr><td><code>notes</code></td><td>备注</td><td>char(200)</td><td><span class="tag">可选</span></td><td>左右、前后轴等限定</td><td>Front axle</td><td>—</td><td>—</td></tr>
+</table></div>
+
+<h2 id="s5">5. Packaging 包装（Part.packaging JSON 键）</h2>
+<div class="tbl"><table>
+<tr><th>键</th><th>中文</th><th>类型</th><th>级别</th><th>单位</th><th>示例</th><th>清洗规则</th></tr>
+<tr><td><code>unit</code></td><td>销售单位</td><td>string</td><td><span class="tag rec">推荐</span></td><td>pc / set / pair / kit</td><td>set</td><td>"pcs" → pc；"套" → set</td></tr>
+<tr><td><code>pcs_per_carton</code></td><td>每箱数量</td><td>int</td><td><span class="tag rec">推荐</span></td><td>—</td><td>20</td><td>"20pcs/ctn" 提取数字</td></tr>
+<tr><td><code>carton_l_cm</code> / <code>carton_w_cm</code> / <code>carton_h_cm</code></td><td>外箱尺寸</td><td>decimal</td><td><span class="tag">可选</span></td><td>cm</td><td>45 / 30 / 25</td><td>"45*30*25cm" 拆分；mm 换算</td></tr>
+<tr><td><code>gross_weight_kg</code> / <code>net_weight_kg</code></td><td>毛重 / 净重</td><td>decimal</td><td><span class="tag rec">推荐</span>（毛重）</td><td>kg</td><td>12.5 / 11.8</td><td>g 换算；"12.5KGS" 提取</td></tr>
+<tr><td><code>inner_pack</code></td><td>内包装</td><td>string</td><td><span class="tag">可选</span></td><td>—</td><td>Color box</td><td>—</td></tr>
+</table></div>
+
+<h2 id="s6">6. Category 与 attribute_schema</h2>
+<p>分类为两级树。每个叶子分类的 <code>attribute_schema</code> 描述该类产品需要哪些属性，供导入校验、AI 补全与完整度评分共用。格式：</p>
+<pre><code>{
+  "fields": [
+    {"key": "length_mm", "label": "长度", "type": "number", "unit": "mm", "required": true},
+    {"key": "friction_material", "label": "摩擦材料", "type": "enum", "options": ["semi-metallic", "ceramic", "organic"], "required": false}
+  ]
+}</code></pre>
+<div class="tbl"><table>
+<tr><th>一级</th><th>二级（叶子）</th><th>必填属性</th><th>可选属性</th></tr>
+<tr><td>制动系统 Brake</td><td>刹车片 Brake Pad</td><td>length_mm, width_mm, thickness_mm</td><td>friction_material, wear_sensor</td></tr>
+<tr><td>制动系统 Brake</td><td>刹车盘 Brake Disc</td><td>outer_diameter_mm, thickness_mm, bolt_holes</td><td>height_mm, min_thickness_mm</td></tr>
+<tr><td>制动系统 Brake</td><td>制动气室 Brake Chamber</td><td>type (T24/T30…), stroke_mm</td><td>mounting</td></tr>
+<tr><td>滤清器 Filter</td><td>空气滤清器 Air Filter</td><td>outer_diameter_mm, height_mm</td><td>inner_diameter_mm</td></tr>
+<tr><td>滤清器 Filter</td><td>机油滤清器 Oil Filter</td><td>thread, outer_diameter_mm, height_mm</td><td>bypass_valve</td></tr>
+<tr><td>滤清器 Filter</td><td>燃油滤清器 Fuel Filter</td><td>thread, outer_diameter_mm, height_mm</td><td>water_separator</td></tr>
+<tr><td>传动系统 Driveline</td><td>离合器片 Clutch Disc</td><td>outer_diameter_mm, spline_teeth, spline_diameter_mm</td><td>facing_material</td></tr>
+<tr><td>悬挂系统 Suspension</td><td>减震器 Shock Absorber</td><td>extended_length_mm, compressed_length_mm, mounting_top, mounting_bottom</td><td>gas_pressure</td></tr>
+<tr><td>冷却系统 Cooling</td><td>水泵 Water Pump</td><td>impeller_diameter_mm, bolt_holes</td><td>with_gasket</td></tr>
+<tr><td>电气系统 Electrical</td><td>前大灯 Headlamp</td><td>side (LH/RH), voltage</td><td>bulb_type</td></tr>
+<tr><td>发动机件 Engine</td><td>涡轮增压器 Turbocharger</td><td>turbo_model</td><td>with_actuator</td></tr>
+<tr><td>车身件 Body</td><td>后视镜 Mirror</td><td>side (LH/RH), heated</td><td>electric</td></tr>
+</table></div>
+
+<h2 id="s7">7. SupplierOffer 供应商报价</h2>
+<div class="tbl"><table>
+<tr><th>字段</th><th>中文</th><th>类型</th><th>级别</th><th>格式规则</th><th>示例</th><th>常见脏数据</th><th>清洗规则</th></tr>
+<tr><td><code>supplier</code></td><td>供应商</td><td>FK Supplier</td><td><span class="tag must">必填</span></td><td>导入时由用户选择</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>part</code></td><td>SKU</td><td>FK Part</td><td><span class="tag must">必填</span></td><td>通过 OE / Cross / supplier_pn 匹配；匹配不到时新建 draft Part</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>supplier_pn</code></td><td>供应商料号</td><td>char(64)</td><td><span class="tag rec">推荐</span></td><td>原样保留，同时写一条 kind=SUPPLIER 的 PartNumber</td><td><code>HB-2044</code></td><td>—</td><td>—</td></tr>
+<tr><td><code>unit_cost_usd</code></td><td>单价</td><td>decimal(10,2)</td><td><span class="tag must">必填</span></td><td>USD；人民币报价按导入时填写的汇率换算并在 notes 记录原币种与汇率</td><td>18.50</td><td>"USD 18.5"、"¥128"、"18.5/pc"</td><td>提取数字与币种符号；非 USD 换算</td></tr>
+<tr><td><code>moq</code></td><td>起订量</td><td>int</td><td><span class="tag rec">推荐</span></td><td>—</td><td>50</td><td>"50pcs"、"50 sets"</td><td>提取数字</td></tr>
+<tr><td><code>lead_days</code></td><td>交期</td><td>int</td><td><span class="tag rec">推荐</span></td><td>天</td><td>25</td><td>"3-4 weeks"、"25 days"</td><td>周换算为天，范围取上限</td></tr>
+<tr><td><code>price_term</code></td><td>价格条款</td><td>enum</td><td><span class="tag">可选</span></td><td>EXW / FOB / CIF</td><td>FOB</td><td>—</td><td>—</td></tr>
+<tr><td><code>quoted_at</code></td><td>报价日期</td><td>date</td><td><span class="tag must">必填</span></td><td>默认导入日</td><td>2026-09-01</td><td>"2026.9.1"、"Sep 1"</td><td>多格式解析</td></tr>
+<tr><td><code>valid_until</code></td><td>有效期</td><td>date</td><td><span class="tag">可选</span></td><td>—</td><td>—</td><td>—</td><td>—</td></tr>
+<tr><td><code>notes</code></td><td>备注</td><td>text</td><td><span class="tag">可选</span></td><td>质量记录、原币种</td><td>—</td><td>—</td><td>—</td></tr>
+</table></div>
+
+<h2 id="s8">8. PartImage 图片</h2>
+<div class="tbl"><table>
+<tr><th>字段</th><th>中文</th><th>类型</th><th>级别</th><th>规则</th></tr>
+<tr><td><code>image</code></td><td>文件</td><td>ImageField</td><td><span class="tag must">必填</span></td><td>jpg / png / webp ≤ 10 MB；入库时用 Pillow 校验并重编码；长边压到 1600；文件名 uuid</td></tr>
+<tr><td><code>is_primary</code></td><td>主图</td><td>bool</td><td>系统</td><td>每个 Part 至多一张；首张自动设为主图</td></tr>
+<tr><td><code>source</code></td><td>来源</td><td>enum</td><td>系统</td><td>manual / import（supplier 提供）/ url（从 image_url 拉取）</td></tr>
+<tr><td><code>caption</code></td><td>说明</td><td>char(200)</td><td><span class="tag">可选</span></td><td>角度、包装、细节</td></tr>
+</table></div>
+
+<h2 id="s9">9. 品牌编号格式规律</h2>
+<div class="note warn"><b>用途限定。</b>这些规律只用于三件事：归一化后的品牌提示、导入时判断 OE 还是 Cross、演示数据的合成格式。它们不是校验规则，不能用来判断一个编号真假。真实 OE 号必须以车厂目录或供应商资料为准。</div>
+<div class="tbl"><table>
+<tr><th>品牌</th><th>类型</th><th>常见格式</th><th>示例（格式示意）</th><th>归一化后</th><th>备注</th></tr>
+<tr><td>Volvo Trucks</td><td>整车厂</td><td>8 位数字</td><td><code>20443906</code></td><td><code>20443906</code></td><td>Renault Trucks 常以 <code>74</code> + Volvo 8 位表示同一件</td></tr>
+<tr><td>Renault Trucks</td><td>整车厂</td><td>10 位数字，<code>50</code> 或 <code>74</code> 开头</td><td><code>7420443906</code></td><td><code>7420443906</code></td><td>与 Volvo 的对应关系是典型 Cross 案例</td></tr>
+<tr><td>Scania</td><td>整车厂</td><td>7 位数字</td><td><code>1746641</code></td><td><code>1746641</code></td><td>—</td></tr>
+<tr><td>Mercedes-Benz</td><td>整车厂</td><td><code>A</code> + 10 位数字，常带空格分组</td><td><code>A 000 420 15 20</code></td><td><code>A0004201520</code></td><td>也有 <code>N</code>、<code>Q</code> 开头的标准件号</td></tr>
+<tr><td>MAN</td><td>整车厂</td><td><code>81.xxxxx-xxxx</code> 或 <code>51.xxxxx-xxxx</code></td><td><code>81.50201-6229</code></td><td><code>81502016229</code></td><td>点与横杠是书写习惯，非编号一部分</td></tr>
+<tr><td>DAF</td><td>整车厂</td><td>7 位数字</td><td><code>1387578</code></td><td><code>1387578</code></td><td>与 Scania 同长度，需靠 brand 区分</td></tr>
+<tr><td>Iveco</td><td>整车厂</td><td>8–9 位数字</td><td><code>500054655</code></td><td><code>500054655</code></td><td>—</td></tr>
+<tr><td>Cummins</td><td>发动机厂</td><td>7 位数字</td><td><code>3924432</code></td><td><code>3924432</code></td><td>—</td></tr>
+<tr><td>Sinotruk HOWO</td><td>整车厂</td><td><code>WG</code> / <code>VG</code> / <code>AZ</code> + 10 位数字</td><td><code>WG9100470107</code></td><td><code>WG9100470107</code></td><td>—</td></tr>
+<tr><td>Shacman</td><td>整车厂</td><td><code>DZ</code> + 10 位数字</td><td><code>DZ9100410205</code></td><td><code>DZ9100410205</code></td><td>—</td></tr>
+<tr><td>Weichai</td><td>发动机厂</td><td>12 位数字，<code>61</code> 开头常见</td><td><code>612600061838</code></td><td><code>612600061838</code></td><td>—</td></tr>
+<tr><td>Knorr-Bremse</td><td>零部件</td><td><code>K</code> + 6 位数字，或 <code>II</code> + 5 位 + 字母</td><td><code>K001234</code></td><td><code>K001234</code></td><td>Cross 常见来源</td></tr>
+<tr><td>WABCO</td><td>零部件</td><td>10 位数字</td><td><code>9325000010</code></td><td><code>9325000010</code></td><td>—</td></tr>
+<tr><td>Bosch</td><td>零部件</td><td>10 位数字，常带空格</td><td><code>0 986 424 813</code></td><td><code>0986424813</code></td><td>前导 0 不能丢</td></tr>
+<tr><td>MANN-FILTER</td><td>零部件</td><td>字母 + 空格 + 数字，可带斜杠</td><td><code>WK 1080/7</code></td><td><code>WK10807</code></td><td>斜杠是编号一部分，但归一化统一去掉，原文保留在 number</td></tr>
+<tr><td>Fleetguard</td><td>零部件</td><td>2 字母 + 4–5 位数字</td><td><code>FF5052</code></td><td><code>FF5052</code></td><td>—</td></tr>
+<tr><td>Donaldson</td><td>零部件</td><td><code>P</code> + 6 位数字</td><td><code>P550425</code></td><td><code>P550425</code></td><td>—</td></tr>
+<tr><td>Sachs</td><td>零部件</td><td>10 位数字，常带空格</td><td><code>3400 700 526</code></td><td><code>3400700526</code></td><td>—</td></tr>
+</table></div>
+
+<h2 id="s10">10. 常见脏数据与清洗规则</h2>
+<div class="tbl"><table>
+<tr><th>#</th><th>脏数据形态</th><th>示例</th><th>清洗规则</th><th>落在哪</th></tr>
+<tr><td>1</td><td>编号带分隔符</td><td><code>2044-3906</code>、<code>20 443 906</code>、<code>81.50201-6229</code></td><td>number 保留原文；number_norm 去分隔符</td><td>normalize</td></tr>
+<tr><td>2</td><td>一格多编号</td><td><code>20443906/20568713</code>、换行分隔</td><td>按 <code>/ , ; 、 | 换行</code> 拆分为多条 PartNumber</td><td>loader</td></tr>
+<tr><td>3</td><td>全角字符</td><td><code>２０４４３９０６</code></td><td>NFKC 归一为半角</td><td>normalize</td></tr>
+<tr><td>4</td><td>大小写混杂</td><td><code>wg9100470107</code></td><td>number_norm 转大写</td><td>normalize</td></tr>
+<tr><td>5</td><td>字母 O 与数字 0、字母 I 与数字 1</td><td><code>2O443906</code></td><td>不自动替换；模糊匹配阶段会命中并标低分，由人确认</td><td>matcher</td></tr>
+<tr><td>6</td><td>Excel 把编号当数字，丢前导 0 或变科学计数</td><td><code>986424813</code>、<code>9.86E+08</code></td><td>读表时全部列按字符串读取；科学计数无法恢复的标记无效行</td><td>loader</td></tr>
+<tr><td>7</td><td>数值带单位</td><td><code>210mm</code>、<code>12.5KGS</code>、<code>3-4 weeks</code></td><td>正则提取数字与单位并换算</td><td>loader</td></tr>
+<tr><td>8</td><td>表头不在第一行 / 多级表头</td><td>前两行是公司抬头</td><td>取前 10 行中非空单元格最多的一行为表头</td><td>loader</td></tr>
+<tr><td>9</td><td>合并单元格导致空值</td><td>品牌只在首行出现</td><td>对映射为 brand / make 的列做向下填充</td><td>loader</td></tr>
+<tr><td>10</td><td>OE 与 Cross 混在同一列</td><td>"Ref No" 列同时有 Volvo 与 Knorr 号</td><td>按 brand 是否整车厂拆分 kind；不确定时 confidence 0.6</td><td>loader</td></tr>
+<tr><td>11</td><td>品牌拼写变体</td><td>VOLVO、沃尔沃、Volvo Trucks、Benz、MB</td><td>品牌别名表归一</td><td>loader</td></tr>
+<tr><td>12</td><td>中英混排的品名</td><td>刹车片 Brake Pad FH12</td><td>按字符集拆分到 name_zh / name_en；车系移到 Fitment</td><td>loader + AI</td></tr>
+<tr><td>13</td><td>同一 SKU 重复出现</td><td>同一供应商表内两行同 OE</td><td>同批内合并，价格取最新；跨批按更新规则</td><td>loader</td></tr>
+<tr><td>14</td><td>同一 OE 指向不同 SKU</td><td>历史录入错误或真实互换</td><td>不阻止，进疑似重复列表由人判断</td><td>quality</td></tr>
+<tr><td>15</td><td>图片链接失效或非图片</td><td>image_url 返回 404 / HTML</td><td>拉取失败记录到 ImportRow.message，不影响其他字段</td><td>loader</td></tr>
+</table></div>
+
+<h2 id="s11">11. 供应商表头同义词表</h2>
+<p>导入映射的第一道规则。表头先做归一化（小写、去空白与标点）再查表；命中即 confidence 1.0，未命中的表头才交给 AI。</p>
+<div class="tbl"><table>
+<tr><th>标准字段</th><th>同义词（英文）</th><th>同义词（中文）</th></tr>
+<tr><td><code>sku</code></td><td>sku, item no, item code, our no, fit no, article no, art no</td><td>我方料号, 料号, 货号, 编码</td></tr>
+<tr><td><code>oe_number</code></td><td>oe, oe no, oem, oem no, oem number, original no, original number, genuine no, factory no</td><td>原厂号, 原厂编号, OE号, 原厂件号, 主机厂号</td></tr>
+<tr><td><code>cross_number</code></td><td>cross, cross ref, cross reference, ref, ref no, reference, interchange, replaces, replacement, comp no, competitor no, equivalent</td><td>互换号, 替代号, 参考号, 对应号, 通用号</td></tr>
+<tr><td><code>supplier_pn</code></td><td>part no, part number, p/n, pn, supplier no, our code, model no, model</td><td>型号, 供应商编号, 厂家编号, 产品编号</td></tr>
+<tr><td><code>name_en</code></td><td>description, desc, product name, name, item, product, title</td><td>英文品名, 英文名称</td></tr>
+<tr><td><code>name_zh</code></td><td>chinese name, cn name</td><td>品名, 名称, 中文名, 产品名称</td></tr>
+<tr><td><code>category</code></td><td>category, cat, group, product group, type</td><td>分类, 类别, 品类</td></tr>
+<tr><td><code>brand</code></td><td>brand, make, oem brand, manufacturer</td><td>品牌, 厂家</td></tr>
+<tr><td><code>make</code></td><td>application, vehicle, vehicle make, truck, for</td><td>适用车型, 车型, 适配, 适用</td></tr>
+<tr><td><code>model</code></td><td>model, series, vehicle model</td><td>车系, 型号（在适配列附近时）</td></tr>
+<tr><td><code>engine</code></td><td>engine, engine model, engine type</td><td>发动机, 机型</td></tr>
+<tr><td><code>year_from</code> / <code>year_to</code></td><td>year, years, from, to, year range</td><td>年份, 年款</td></tr>
+<tr><td><code>unit_cost</code></td><td>price, unit price, cost, fob, fob price, exw, exw price, usd, rmb, quote</td><td>单价, 价格, 报价, 含税价, 不含税价</td></tr>
+<tr><td><code>currency</code></td><td>currency, cur</td><td>币种</td></tr>
+<tr><td><code>moq</code></td><td>moq, min order, minimum order, min qty</td><td>起订量, 最小起订量</td></tr>
+<tr><td><code>lead_days</code></td><td>lead time, leadtime, delivery, delivery time</td><td>交期, 交货期, 货期</td></tr>
+<tr><td><code>pcs_per_carton</code></td><td>qty/ctn, pcs/ctn, packing, pack qty, carton qty</td><td>装箱数, 每箱数量, 包装数量</td></tr>
+<tr><td><code>carton_l_cm</code> 等</td><td>carton size, ctn size, dimension, l*w*h, size</td><td>箱规, 外箱尺寸, 尺寸</td></tr>
+<tr><td><code>gross_weight_kg</code></td><td>gw, g.w., gross weight, weight</td><td>毛重, 重量</td></tr>
+<tr><td><code>net_weight_kg</code></td><td>nw, n.w., net weight</td><td>净重</td></tr>
+<tr><td><code>image_url</code></td><td>image, photo, picture, pic, img, image url</td><td>图片, 照片</td></tr>
+<tr><td><code>description_en</code></td><td>remarks, remark, note, notes, detail, details, spec, specification</td><td>备注, 说明, 规格</td></tr>
+</table></div>
+
+<h2 id="s12">12. 合成演示数据规范</h2>
+<p><code>seed_demo</code> 命令生成的数据必须遵守本字典的格式，并按下面的比例混入脏数据，让看板与清洗功能有东西可展示。所有编号按第 9 节的格式规律随机生成，并在 README 与页面页脚注明"演示数据，非真实 OE 号"。</p>
+<div class="tbl"><table>
+<tr><th>项</th><th>规范</th></tr>
+<tr><td>规模</td><td>约 400 个 Part，12 个叶子分类，18 个品牌（10 整车厂 + 8 零部件），6 个供应商，约 1200 条 PartNumber，约 600 条 Fitment，约 500 条 SupplierOffer</td></tr>
+<tr><td>Cross 关系</td><td>约 30% 的 Part 有 Renault ↔ Volvo 形式的 Cross（<code>74</code> + Volvo 号）；约 40% 有零部件品牌 Cross</td></tr>
+<tr><td>缺失</td><td>35% 无主图；25% 无 OE；20% 无分类；30% 无适配；25% 无报价；15% 无英文描述</td></tr>
+<tr><td>脏格式</td><td>20% 的 PartNumber.number 带空格或横杠；5% 全角；5% 小写</td></tr>
+<tr><td>重复</td><td>10 组"同一 OE 指向两个 SKU"的疑似重复</td></tr>
+<tr><td>状态</td><td>60% draft、30% reviewed、10% published</td></tr>
+<tr><td>图片</td><td>用 Pillow 生成带分类名与 SKU 文字的占位图，尺寸 800×600，不下载外部图片</td></tr>
+<tr><td>乱格式 Excel</td><td><code>scripts/make_supplier_excel.py</code> 生成 <code>media/demo/supplier_quote_messy.xlsx</code>：前两行公司抬头、表头为 "Part No. / OEM NO / Ref / Description / 适用车型 / MOQ / FOB Price(USD) / Packing"、约 80 行，其中 10 行与库内 SKU 重复、5 行编号格式脏、3 行缺 OE、2 行价格带币种符号</td></tr>
+</table></div>
+</main>
+<footer class="site">标准字段规范 v1.0 · 品牌编号格式仅为经验规律，演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>

@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>系统设计文档 · 卡车配件 AI 产品数据中心</title>
+<meta name="description" content="卡车配件 AI 产品数据库 MVP 的架构设计：技术选型与取舍、Two Scoops 布局、Django 5.2 实践、数据模型、核心服务、流程、治理、测试、CI、部署与提示词附录。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a href="prd.html">PRD</a>
+    <a class="active" href="architecture.html">架构设计</a>
+    <a href="data-dictionary.html">数据字典</a>
+    <a href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>系统设计文档</h1>
+<p class="lede">卡车配件 AI 产品数据中心 · MVP · 架构师视角。每一项选型都写明备选方案、选择理由与放弃了什么。</p>
+<p class="meta">版本 v1.0 · 2026-09-18 · 目标框架 Django 5.2 LTS · Python 3.12</p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#s1">设计目标与约束</a></li>
+<li><a href="#s2">总体架构</a></li>
+<li><a href="#s3">技术选型与取舍</a></li>
+<li><a href="#s4">项目布局（Two Scoops）</a></li>
+<li><a href="#s5">Django 5.2 实践清单</a></li>
+<li><a href="#s6">数据模型</a></li>
+<li><a href="#s7">核心服务设计</a></li>
+<li><a href="#s8">关键流程</a></li>
+<li><a href="#s9">安全与数据治理</a></li>
+<li><a href="#s10">测试策略</a></li>
+<li><a href="#s11">Git 约定与持续集成</a></li>
+<li><a href="#s12">配置与部署</a></li>
+<li><a href="#s13">演进路线</a></li>
+<li><a href="#appendix-prompts">附录 A：提示词全文</a></li>
+<li><a href="#appendix-settings">附录 B：关键配置片段</a></li>
+</ol></div>
+
+<h2 id="s1">1. 设计目标与约束</h2>
+<div class="tbl"><table>
+<tr><th>约束</th><th>对设计的影响</th></tr>
+<tr><td>单人开发，一周出可演示版本</td><td>最大化使用 Django 自带能力（Admin、ORM、模板、测试），不引入前后端分离，不引入消息队列中间件。</td></tr>
+<tr><td>后续可能由不同的 AI 模型或工程师接手</td><td>文档即规格；每个里程碑独立可验收；约定明确到文件名与函数名；避免"聪明"的隐式约定。</td></tr>
+<tr><td>面试场景，需要向非技术人讲清</td><td>架构层次少而清晰：页面 → 服务 → 数据；每个 AI 介入点都能指出"在哪一步、人怎么确认"。</td></tr>
+<tr><td>国内网络环境</td><td>大模型走 OpenAI 兼容接口；前端库用 CDN 且有本地回退；必须有离线 mock 模式。</td></tr>
+<tr><td>数据是核心资产</td><td>一切写入可追溯（source / confidence / verified）；AI 不直接写业务字段。</td></tr>
+</table></div>
+
+<h2 id="s2">2. 总体架构</h2>
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="总体架构图">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor" opacity=".6"/></marker></defs>
+<rect class="box ext" x="20" y="30" width="180" height="60" rx="8"/><text x="110" y="55" text-anchor="middle">浏览器</text><text x="110" y="75" text-anchor="middle" class="small">HTMX + Tailwind + Alpine</text>
+<rect class="box" x="290" y="20" width="340" height="242" rx="10"/><text x="460" y="42" text-anchor="middle" font-weight="600">Django 5.2 应用（单进程）</text>
+<rect class="box soft" x="310" y="60" width="140" height="44" rx="6"/><text x="380" y="80" text-anchor="middle">views / forms</text><text x="380" y="96" text-anchor="middle" class="small">薄视图，HTMX 局部模板</text>
+<rect class="box soft" x="470" y="60" width="140" height="44" rx="6"/><text x="540" y="80" text-anchor="middle">Django Admin</text><text x="540" y="96" text-anchor="middle" class="small">后台 CRUD 兜底</text>
+<rect class="box soft" x="310" y="120" width="300" height="64" rx="6"/><text x="460" y="139" text-anchor="middle">services 层</text><text x="460" y="156" text-anchor="middle" class="small">normalize · matcher · quality · importer</text><text x="460" y="172" text-anchor="middle" class="small">llm · quoting · export</text>
+<rect class="box soft" x="310" y="196" width="300" height="44" rx="6"/><text x="460" y="215" text-anchor="middle">models / QuerySet / Manager</text><text x="460" y="231" text-anchor="middle" class="small">catalog · suppliers · inquiries · importer · ai · users</text>
+<rect class="box" x="290" y="290" width="160" height="70" rx="10"/><text x="370" y="318" text-anchor="middle">django-q2 worker</text><text x="370" y="338" text-anchor="middle" class="small">ORM broker，无 redis</text>
+<rect class="box ext" x="700" y="60" width="180" height="70" rx="8"/><text x="790" y="88" text-anchor="middle">PostgreSQL 16</text><text x="790" y="108" text-anchor="middle" class="small">pg_trgm · docker</text>
+<rect class="box ext" x="700" y="170" width="180" height="70" rx="8"/><text x="790" y="198" text-anchor="middle">大模型提供商</text><text x="790" y="218" text-anchor="middle" class="small">DeepSeek / 千问 / Kimi · mock</text>
+<rect class="box ext" x="700" y="290" width="180" height="70" rx="8"/><text x="790" y="318" text-anchor="middle">媒体与上传目录</text><text x="790" y="338" text-anchor="middle" class="small">MEDIA_ROOT · Pillow 校验</text>
+<path class="arrow" d="M200,60 L290,60"/><text x="245" y="52" text-anchor="middle" class="small">HTTP</text>
+<path class="arrow" d="M630,95 L700,95"/>
+<path class="arrow" d="M630,150 L700,200"/><text x="655" y="140" text-anchor="middle" class="small">openai SDK</text>
+<path class="arrow" d="M630,215 L700,320"/>
+<path class="arrow" d="M370,290 L370,262"/><text x="400" y="272" class="small">复用 services</text>
+<path class="arrow" d="M450,325 L700,325"/><text x="575" y="318" text-anchor="middle" class="small">任务表在 PostgreSQL</text>
+</svg>
+<figcaption>图 1 · 总体架构。所有业务逻辑集中在 services 层，页面与后台任务都只调用服务，不各自实现一遍。</figcaption>
+</figure>
+<p>三个层次：</p>
+<ul>
+<li><b>表现层</b>：Django 模板 + HTMX。搜索、映射确认、审核采纳等交互通过 HTMX 请求局部模板刷新，没有单独的前端工程。Django Admin 提供所有模型的后台 CRUD。</li>
+<li><b>服务层</b>：纯 Python 模块，输入输出是明确的数据类或 QuerySet，不依赖 request。视图和后台任务都调用它们。这一层承担业务规则，是测试的重点。</li>
+<li><b>数据层</b>：Django 模型、自定义 QuerySet 与 Manager。查询逻辑放在 QuerySet 上，让服务层和 Admin 都能复用。</li>
+</ul>
+
+<h2 id="s3">3. 技术选型与取舍</h2>
+<div class="tbl"><table>
+<tr><th>决策点</th><th>选择</th><th>备选</th><th>为什么这样选</th><th>放弃了什么</th></tr>
+<tr><td>Web 框架</td><td>Django 5.2 LTS</td><td>FastAPI + React；Flask</td><td>Admin、ORM、迁移、认证、表单、测试一体，单人一周内最省。5.2 是 LTS，支持到 2028 年。</td><td>API 优先的灵活性；前端独立演进。</td></tr>
+<tr><td>数据库</td><td>PostgreSQL 16 + pg_trgm</td><td>SQLite；MySQL</td><td>trigram 相似度是编号模糊匹配的最短路径，<code>django.contrib.postgres</code> 直接支持；JSONField 查询更强。docker 一行起服务。</td><td>零依赖的便携性。补救：<code>DATABASE_URL</code> 未设时回退 SQLite，模糊匹配退化为 Python 端 difflib。</td></tr>
+<tr><td>前端交互</td><td>模板 + HTMX + Tailwind CDN + Alpine.js</td><td>React / Vue SPA；纯服务端渲染</td><td>搜索即时刷新、映射表格编辑、审核采纳都是"改一小块"，HTMX 正合适；无构建步骤，接手者门槛最低。</td><td>复杂前端状态管理。Tailwind CDN 不适合生产，但演示够用；<code>static/vendor/</code> 保留本地副本以防断网。</td></tr>
+<tr><td>后台任务</td><td>django-q2（ORM broker）</td><td>Celery + Redis；同步执行</td><td>批量 AI 补全会跑几分钟，必须异步；django-q2 的 ORM broker 不需要 redis，任务表就在 PostgreSQL，部署只多一个 <code>qcluster</code> 进程。测试时设 <code>sync=True</code> 同步执行。</td><td>Celery 的生态与可观测性。</td></tr>
+<tr><td>大模型接入</td><td>openai SDK + 可配置 base_url</td><td>各家原生 SDK；LangChain</td><td>DeepSeek、通义千问 DashScope、Kimi 都提供 OpenAI 兼容接口，一套代码切换模型；视觉能力走同一 chat 接口传图。不用 LangChain 是因为抽象层次过重，调试成本高。</td><td>各家特有功能（如千问的原生 JSON schema）。抽象接口留有 anthropic 实现位，本期不做。</td></tr>
+<tr><td>结构化输出</td><td>JSON mode + pydantic 校验</td><td>自由文本解析；function calling</td><td>三家兼容接口都支持 <code>response_format={"type":"json_object"}</code>；pydantic 校验失败则重试一次并降级为"低置信度"。</td><td>严格 schema 约束。用 pydantic 在客户端补足。</td></tr>
+<tr><td>图片匹配</td><td>视觉大模型描述 + OCR 编号 → 文本匹配</td><td>CLIP 向量以图搜图；训练分类模型</td><td>零训练、零向量库，一周内可交付；识别出编号后复用文本匹配，结果可解释。</td><td>无编号照片的相似度检索质量。列入演进路线。</td></tr>
+<tr><td>Excel / CSV</td><td>pandas + openpyxl</td><td>纯 openpyxl；tablib</td><td>表头定位、空行清理、类型推断用 pandas 最少代码；openpyxl 负责读写 xlsx。</td><td>依赖体积。可接受。</td></tr>
+<tr><td>PDF</td><td>pdfplumber 文本提取 + AI 抽取（可选）</td><td>表格识别；OCR</td><td>MVP 只需把 PDF 变成文本喂给字段提取提示词，pdfplumber 足够。</td><td>扫描件 OCR。不做。</td></tr>
+<tr><td>配置</td><td>django-environ + .env</td><td>python-decouple；直接读 os.environ</td><td>Two Scoops 推荐；<code>DATABASE_URL</code> 一行解析。</td><td>无。</td></tr>
+<tr><td>测试</td><td>pytest + pytest-django + factory_boy</td><td>Django TestCase</td><td>fixture 更灵活，工厂让测试数据可读；CI 直接跑 pytest。</td><td>无。</td></tr>
+<tr><td>静态文件</td><td>whitenoise</td><td>nginx</td><td>演示机一条 gunicorn 命令即可服务静态文件。</td><td>高并发性能。不需要。</td></tr>
+<tr><td>归一化编号存储</td><td>Python 计算后写入普通字段</td><td>Django 5 <code>GeneratedField</code></td><td>同一套归一化规则必须同时用于入库与查询输入，放在 Python 保证单一实现；SQLite 没有 regexp 函数，GeneratedField 会破坏回退能力。</td><td>数据库级一致性保证。用 <code>save()</code> 与导入服务统一入口 + 测试补足。</td></tr>
+<tr><td>业务逻辑位置</td><td>services 模块 + 自定义 QuerySet</td><td>胖模型；逻辑写在视图</td><td>Two Scoops：视图保持薄；查询逻辑归 QuerySet；跨模型的编排逻辑（导入、匹配、报价）归 services，便于视图和后台任务复用与单测。</td><td>无。</td></tr>
+</table></div>
+
+<h2 id="s4">4. 项目布局（Two Scoops）</h2>
+<pre><code>truck-parts-data-center-project/
+├── manage.py
+├── pyproject.toml              # ruff、pytest 配置
+├── requirements/
+│   ├── base.txt                # Django、psycopg、django-environ、django-htmx、django-q2、openai、pandas、openpyxl、pillow、pydantic、whitenoise
+│   ├── local.txt               # -r base.txt + pytest、pytest-django、factory_boy、ruff、django-debug-toolbar
+│   └── production.txt          # -r base.txt + gunicorn
+├── .env.example
+├── .gitignore
+├── docker-compose.yml          # 仅 postgres:16，挂 init SQL 启用 pg_trgm
+├── docker/postgres/init.sql
+├── .github/workflows/ci.yml
+├── AGENTS.md                   # 给 Codex 等模型的接手说明（内容见进度表）
+├── CLAUDE.md                   # 给 Claude 的接手说明
+├── config/
+│   ├── __init__.py
+│   ├── settings/
+│   │   ├── __init__.py
+│   │   ├── base.py             # 所有公共设置
+│   │   ├── local.py            # DEBUG、debug-toolbar、q2 sync
+│   │   ├── test.py             # SQLite 或 PG 均可、q2 sync、LLM mock
+│   │   └── production.py       # 安全头、whitenoise
+│   ├── urls.py
+│   ├── wsgi.py
+│   └── asgi.py
+├── apps/
+│   ├── __init__.py
+│   ├── core/                   # TimeStampedModel、通用 mixin、首页与看板视图、模板标签
+│   ├── users/                  # 自定义 User（AbstractUser），Two Scoops 强烈建议一开始就建
+│   ├── catalog/                # Category、Brand、Part、PartNumber、Fitment、PartImage
+│   │   ├── models.py  managers.py  admin.py  forms.py  views.py  urls.py
+│   │   ├── services/           # normalize.py  matcher.py  quality.py
+│   │   ├── management/commands/seed_demo.py  recompute_quality.py
+│   │   ├── templates/catalog/  # 该 app 的模板，命名空间隔离
+│   │   └── tests/              # test_models.py  test_normalize.py  test_matcher.py  test_quality.py
+│   ├── suppliers/              # Supplier、SupplierOffer；services/quoting.py
+│   ├── inquiries/              # Inquiry、QuoteLine；搜索与图片询价视图；services/export.py
+│   ├── importer/               # ImportBatch、ImportRow；services/mapping.py  services/loader.py
+│   └── ai/                     # AITask、AISuggestion；llm/base.py  llm/openai_compat.py  llm/mock.py  llm/factory.py；prompts/*.md；tasks.py
+├── templates/                  # base.html、partials/、registration/
+├── static/                     # app.css、vendor/（htmx、alpine 本地副本）
+├── media/                      # 运行时上传，git 忽略
+├── scripts/make_supplier_excel.py
+└── docs/                       # 本文档站
+</code></pre>
+<h3>布局背后的规则</h3>
+<ul>
+<li><b>settings 拆分</b>：<code>base.py</code> 放公共项，<code>local / test / production</code> 只写差异；通过 <code>DJANGO_SETTINGS_MODULE</code> 切换，默认 <code>config.settings.local</code>。密钥、数据库地址、模型接口一律来自环境变量，<code>.env.example</code> 列出全部键。</li>
+<li><b>apps/ 命名空间</b>：所有 app 放在 <code>apps/</code> 下，<code>INSTALLED_APPS</code> 写 <code>apps.catalog</code>，避免与第三方包重名。每个 app 只做一件事，跨 app 的编排放在调用方的 services 里，禁止循环导入（<code>importer</code> 依赖 <code>catalog</code> 与 <code>ai</code>，反向不允许）。</li>
+<li><b>模板与静态文件</b>：全局布局在根 <code>templates/</code>，各 app 模板放自己目录并加 app 名前缀，例如 <code>catalog/part_detail.html</code>。</li>
+<li><b>requirements 分层</b>：生产环境不装测试工具；<code>pip install -r requirements/local.txt</code> 是开发者的唯一安装命令。</li>
+<li><b>自定义 User</b>：Two Scoops 反复强调项目一开始就用自定义 User 模型，之后再改代价极高。MVP 阶段它只是 <code>class User(AbstractUser): pass</code>。</li>
+<li><b>不在 views 里写业务</b>：视图负责取参数、调服务、渲染模板；任何超过 10 行的逻辑进 services 或 QuerySet。</li>
+</ul>
+
+<h2 id="s5">5. Django 5.2 实践清单</h2>
+<div class="tbl"><table>
+<tr><th>实践</th><th>用在哪</th><th>说明</th></tr>
+<tr><td><code>Meta.constraints</code> 的 <code>UniqueConstraint</code> / <code>CheckConstraint</code></td><td>PartNumber、SupplierOffer、Fitment</td><td>用数据库约束而非 <code>unique_together</code>；带 <code>name</code>，<code>violation_error_message</code> 给出中文提示。</td></tr>
+<tr><td><code>db_default</code>（5.0+）</td><td>status、confidence、verified、completeness_score</td><td>默认值下沉到数据库，批量 SQL 写入也保持一致。</td></tr>
+<tr><td>自定义 <code>QuerySet.as_manager()</code></td><td>Part、PartNumber、Inquiry</td><td>例如 <code>Part.objects.published()</code>、<code>.with_min_cost()</code>、<code>.missing("image")</code>；Admin 与服务层共用。</td></tr>
+<tr><td><code>django.contrib.postgres.search.TrigramSimilarity</code> + <code>GinIndex(opclasses=["gin_trgm_ops"])</code></td><td>PartNumber.number_norm、Part.name_en</td><td>索引在迁移里用 <code>TrigramExtension()</code> 与 <code>GinIndex</code> 建；SQLite 下迁移跳过（条件判断 <code>connection.vendor</code>）。</td></tr>
+<tr><td><code>LoginRequiredMiddleware</code>（5.1+）</td><td>全站</td><td>一行配置全站登录，登录页与健康检查用 <code>login_not_required</code> 装饰器豁免。</td></tr>
+<tr><td><code>GeneratedField</code>（5.0+）</td><td>评估后未采用</td><td>见第 3 节取舍：归一化必须在 Python 侧也可用，且要兼容 SQLite。</td></tr>
+<tr><td><code>transaction.atomic()</code> + <code>bulk_create(update_conflicts=True)</code></td><td>导入执行</td><td>整批原子；重复编号按约束冲突处理而不是先查后写。</td></tr>
+<tr><td><code>select_related</code> / <code>prefetch_related</code> + <code>Prefetch</code></td><td>产品详情、搜索结果</td><td>结果卡片一页最多 20 个 SKU，控制在 6 条 SQL 以内；测试里用 <code>django_assert_max_num_queries</code>。</td></tr>
+<tr><td>模板 <code>{% include %}</code> 局部 + django-htmx</td><td>搜索结果、映射表、审核台</td><td>同一个视图按 <code>request.htmx</code> 返回整页或局部；不重复写模板。</td></tr>
+<tr><td>表单 <code>as_field_group</code>（5.0+）与字段模板</td><td>导入向导、报价表单</td><td>统一表单渲染，减少模板重复。</td></tr>
+<tr><td><code>ImageField</code> + Pillow 校验 + 上传路径函数</td><td>PartImage、图片询价</td><td>校验 MIME 与尺寸，重命名为 uuid，避免路径注入。</td></tr>
+<tr><td>管理命令而非 signals</td><td>完整度重算</td><td>评分在服务层显式调用（导入后、采纳后），另有 <code>recompute_quality</code> 全量命令。不用 signals 是为了可读与可测。</td></tr>
+<tr><td><code>JSONField</code> + pydantic 模型校验</td><td>attributes、packaging、column_mapping、AI 输出</td><td>数据库存 JSON，边界处用 pydantic 校验结构，避免"什么都能塞"。</td></tr>
+<tr><td>Admin：<code>list_select_related</code>、<code>autocomplete_fields</code>、<code>@admin.display</code></td><td>全部 Admin</td><td>大表不卡；外键选择用自动完成。</td></tr>
+</table></div>
+
+<h2 id="s6">6. 数据模型</h2>
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 520" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="实体关系图">
+<g>
+<rect class="box" x="20" y="200" width="150" height="70" rx="8"/><text x="95" y="225" text-anchor="middle" font-weight="600">Category</text><text x="95" y="245" text-anchor="middle" class="small">name · parent · attribute_schema</text>
+<rect class="box" x="20" y="300" width="150" height="60" rx="8"/><text x="95" y="325" text-anchor="middle" font-weight="600">Brand</text><text x="95" y="345" text-anchor="middle" class="small">name · kind (OEM/AM)</text>
+<rect class="box soft" x="260" y="180" width="200" height="130" rx="8"/><text x="360" y="205" text-anchor="middle" font-weight="600">Part</text><text x="360" y="226" text-anchor="middle" class="small">sku · name_en · name_zh · category</text><text x="360" y="244" text-anchor="middle" class="small">attributes · packaging · description_en</text><text x="360" y="262" text-anchor="middle" class="small">keywords · status · completeness_score</text><text x="360" y="280" text-anchor="middle" class="small">source · created_at · updated_at</text>
+<rect class="box" x="540" y="40" width="190" height="80" rx="8"/><text x="635" y="65" text-anchor="middle" font-weight="600">PartNumber</text><text x="635" y="85" text-anchor="middle" class="small">number · number_norm · kind</text><text x="635" y="103" text-anchor="middle" class="small">brand · source · confidence · verified</text>
+<rect class="box" x="540" y="140" width="190" height="60" rx="8"/><text x="635" y="165" text-anchor="middle" font-weight="600">Fitment</text><text x="635" y="185" text-anchor="middle" class="small">make · model · engine · year_from/to</text>
+<rect class="box" x="540" y="220" width="190" height="60" rx="8"/><text x="635" y="245" text-anchor="middle" font-weight="600">PartImage</text><text x="635" y="265" text-anchor="middle" class="small">image · is_primary · source</text>
+<rect class="box" x="540" y="300" width="190" height="70" rx="8"/><text x="635" y="325" text-anchor="middle" font-weight="600">SupplierOffer</text><text x="635" y="345" text-anchor="middle" class="small">supplier_pn · unit_cost_usd · moq</text><text x="635" y="361" text-anchor="middle" class="small">lead_days · quoted_at</text>
+<rect class="box" x="780" y="300" width="160" height="70" rx="8"/><text x="860" y="325" text-anchor="middle" font-weight="600">Supplier</text><text x="860" y="345" text-anchor="middle" class="small">name · country · contact</text><text x="860" y="361" text-anchor="middle" class="small">rating · notes</text>
+<rect class="box" x="260" y="360" width="200" height="70" rx="8"/><text x="360" y="385" text-anchor="middle" font-weight="600">AISuggestion</text><text x="360" y="405" text-anchor="middle" class="small">part · payload · status · confidence</text><text x="360" y="421" text-anchor="middle" class="small">reviewed_by · reason · ai_task</text>
+<rect class="box" x="20" y="400" width="200" height="70" rx="8"/><text x="120" y="425" text-anchor="middle" font-weight="600">AITask</text><text x="120" y="445" text-anchor="middle" class="small">prompt_name · model · input_digest</text><text x="120" y="461" text-anchor="middle" class="small">output · tokens · latency_ms · status</text>
+<rect class="box" x="540" y="400" width="190" height="70" rx="8"/><text x="635" y="425" text-anchor="middle" font-weight="600">Inquiry</text><text x="635" y="445" text-anchor="middle" class="small">raw_input · input_type · image</text><text x="635" y="461" text-anchor="middle" class="small">matched_part · status · created_by</text>
+<rect class="box" x="780" y="400" width="160" height="70" rx="8"/><text x="860" y="425" text-anchor="middle" font-weight="600">QuoteLine</text><text x="860" y="445" text-anchor="middle" class="small">inquiry · part · offer · qty</text><text x="860" y="461" text-anchor="middle" class="small">margin · unit_price_usd</text>
+<rect class="box" x="260" y="40" width="200" height="60" rx="8"/><text x="360" y="65" text-anchor="middle" font-weight="600">ImportBatch</text><text x="360" y="85" text-anchor="middle" class="small">file · supplier · column_mapping · stats</text>
+<rect class="box" x="20" y="40" width="200" height="60" rx="8"/><text x="120" y="65" text-anchor="middle" font-weight="600">ImportRow</text><text x="120" y="85" text-anchor="middle" class="small">batch · row_no · raw · result · message</text>
+</g>
+<g class="arrow" style="marker-end:none">
+<path d="M170,235 L260,235"/><path d="M170,330 L260,300"/>
+<path d="M460,210 L540,80"/><path d="M460,230 L540,170"/><path d="M460,250 L540,250"/><path d="M460,280 L540,330"/>
+<path d="M730,335 L780,335"/><path d="M360,310 L360,360"/><path d="M220,435 L260,400"/>
+<path d="M460,300 L540,430"/><path d="M730,435 L780,435"/><path d="M360,100 L360,180"/><path d="M220,70 L260,70"/>
+</g>
+<text x="500" y="500" text-anchor="middle" class="small">连线为外键方向的从属关系；Part 是中心实体，PartNumber 承载 OE / Cross / 供应商料号三种身份。</text>
+</svg>
+<figcaption>图 2 · 实体关系。字段级定义见 <a href="data-dictionary.html">数据字典</a>。</figcaption>
+</figure>
+
+<h3>6.1 设计要点</h3>
+<ul>
+<li><b>编号是独立实体，不是 Part 上的字段。</b>一个 SKU 有多个 OE、多个 Cross、多个供应商料号，且每个编号都需要自己的来源与置信度。<code>PartNumber.kind ∈ {OE, CROSS, SUPPLIER}</code>，<code>brand</code> 指明编号属于哪家。</li>
+<li><b>唯一约束在 (number_norm, kind, brand) 上而非 number_norm 单独。</b>不同品牌可能撞号（尤其纯数字短号）。跨 SKU 的同号冲突不在库级阻止，而是进入"疑似重复"看板，由人判断是真重复还是互换关系。</li>
+<li><b>替代件不单独建表。</b>"共享任一 number_norm 的其他 Part"就是替代件，用 QuerySet 一次查询得到；避免维护互换组的同步问题。演进阶段若需人工维护互换组，再加 <code>InterchangeGroup</code>。</li>
+<li><b>attributes 与 packaging 用 JSONField。</b>每个分类的规格字段不同（刹车片是长宽厚，滤清器是螺纹与外径），用 <code>Category.attribute_schema</code> 描述该类需要哪些键、类型与单位，pydantic 在写入时校验。这比 EAV 表简单得多，且 PostgreSQL 的 JSON 查询够用。</li>
+<li><b>AI 产出走 AISuggestion，不直接进 Part。</b>建议表存完整 payload，采纳时由服务逐字段写回并打 <code>source=ai</code>。这是"AI 只建议"的落地方式。</li>
+<li><b>AITask 与 AISuggestion 分离。</b>AITask 是调用审计（每次请求一条），AISuggestion 是业务对象；一次批量任务产生多条建议，指向同一个 AITask 的不同 <code>ai_task</code> 记录。</li>
+<li><b>ImportRow 保留原始行。</b>导入出错时能追溯到"第 37 行原始值是什么、为什么跳过"，这是数据运营岗最常被问到的问题。</li>
+<li><b>公共字段</b>：所有模型继承 <code>core.TimeStampedModel</code>（created_at、updated_at）；带来源的模型混入 <code>SourcedModel</code>（source、confidence、verified、verified_by、verified_at）。</li>
+</ul>
+<h3>6.2 索引</h3>
+<div class="tbl"><table>
+<tr><th>表</th><th>索引</th><th>用途</th></tr>
+<tr><td>PartNumber</td><td>唯一 (number_norm, kind, brand_id)；B-tree number_norm；GIN trigram number_norm</td><td>精确 / 前缀 / 模糊三级匹配</td></tr>
+<tr><td>Part</td><td>唯一 sku；B-tree (status, completeness_score)；GIN trigram name_en</td><td>看板筛选；名称模糊</td></tr>
+<tr><td>Fitment</td><td>(make, model)；唯一 (part, make, model, engine, year_from, year_to)</td><td>按车型查；防重复</td></tr>
+<tr><td>SupplierOffer</td><td>(part, unit_cost_usd)；唯一 (supplier, part, quoted_at)</td><td>最低成本；同日重复报价</td></tr>
+<tr><td>Inquiry</td><td>(created_at desc)；(matched_part)</td><td>记录页；未命中榜</td></tr>
+</table></div>
+
+<h2 id="s7">7. 核心服务设计</h2>
+<h3>7.1 normalize（编号归一化）</h3>
+<pre><code>apps/catalog/services/normalize.py
+
+def normalize_number(raw: str) -> str
+    # 1. 全角转半角，去首尾空白
+    # 2. 去掉所有非 [A-Za-z0-9] 字符（空格、横杠、点、斜杠、下划线）
+    # 3. 转大写
+    # 4. 结果为空则返回 ""
+    "A 000 420 15 20" -> "A0004201520";  "81.50201-6229" -> "81502016229";  "wg9100470107" -> "WG9100470107"
+
+def detect_query_kind(raw: str) -> Literal["sku", "number", "text"]
+    # 显式前缀 sku: / oe: / name: 优先
+    # 归一化后长度 >= 5 且含数字且字母占比 < 50% -> number
+    # 以公司 SKU 前缀开头 -> sku
+    # 其余 -> text
+
+def brand_hint(norm: str) -> list[str]
+    # 依据数据字典的品牌格式规律返回可能的品牌，仅作排序提示，不作过滤
+</code></pre>
+<p>归一化是全系统唯一实现，入库（模型 <code>save()</code> 与导入服务）和查询都调用它。测试覆盖数据字典列出的每一种脏格式。</p>
+
+<h3>7.2 matcher（三级匹配）</h3>
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="匹配流程">
+<rect class="box ext" x="10" y="95" width="120" height="60" rx="8"/><text x="70" y="120" text-anchor="middle">原始输入</text><text x="70" y="140" text-anchor="middle" class="small">"2044-3906"</text>
+<rect class="box soft" x="160" y="95" width="120" height="60" rx="8"/><text x="220" y="120" text-anchor="middle">normalize</text><text x="220" y="140" text-anchor="middle" class="small">"20443906"</text>
+<rect class="box" x="310" y="20" width="150" height="60" rx="8"/><text x="385" y="45" text-anchor="middle">L1 精确</text><text x="385" y="63" text-anchor="middle" class="small">number_norm = q</text>
+<rect class="box" x="310" y="95" width="150" height="60" rx="8"/><text x="385" y="120" text-anchor="middle">L2 前缀 / 包含</text><text x="385" y="138" text-anchor="middle" class="small">startswith / contains</text>
+<rect class="box" x="310" y="170" width="150" height="60" rx="8"/><text x="385" y="195" text-anchor="middle">L3 模糊</text><text x="385" y="213" text-anchor="middle" class="small">trigram ≥ 0.45 / 名称</text>
+<rect class="box soft" x="500" y="95" width="140" height="60" rx="8"/><text x="570" y="120" text-anchor="middle">合并排序</text><text x="570" y="140" text-anchor="middle" class="small">类型 &gt; 分数 &gt; 完整度</text>
+<rect class="box" x="670" y="60" width="130" height="50" rx="8"/><text x="735" y="90" text-anchor="middle">候选列表</text>
+<rect class="box" x="670" y="140" width="130" height="50" rx="8"/><text x="735" y="170" text-anchor="middle">替代件</text>
+<rect class="box ext" x="820" y="95" width="70" height="60" rx="8"/><text x="855" y="130" text-anchor="middle" class="small">留痕</text>
+<path class="arrow" d="M130,125 L160,125"/><path class="arrow" d="M280,125 L310,50"/><path class="arrow" d="M280,125 L310,125"/><path class="arrow" d="M280,125 L310,200"/>
+<path class="arrow" d="M460,50 L500,110"/><path class="arrow" d="M460,125 L500,125"/><path class="arrow" d="M460,200 L500,140"/>
+<path class="arrow" d="M640,115 L670,85"/><path class="arrow" d="M640,135 L670,165"/><path class="arrow" d="M800,125 L820,125"/>
+<text x="385" y="245" text-anchor="middle" class="small">L1 命中且唯一时跳过 L2/L3；否则逐级补齐到最多 20 条</text>
+</svg>
+<figcaption>图 3 · 三级匹配。每个候选携带 match_type 与 score，前端据此显示"精确 / 归一化 / 模糊"标签。</figcaption>
+</figure>
+<pre><code>apps/catalog/services/matcher.py
+
+@dataclass
+class Candidate:
+    part: Part
+    match_type: Literal["exact", "normalized", "prefix", "fuzzy", "name"]
+    score: float            # 1.0 / 0.95 / 0.8 / trigram 相似度 / 名称相似度
+    matched_number: str | None
+    matched_kind: str | None
+
+def search(raw: str, *, limit: int = 20) -> list[Candidate]
+def alternatives(part: Part) -> QuerySet[Part]      # 共享任一 number_norm 的其他 Part
+def _fuzzy(norm: str) -> list[Candidate]            # PostgreSQL: TrigramSimilarity；SQLite: difflib 对候选池（同前 3 位）计算
+</code></pre>
+<ul>
+<li><b>精确</b>：输入未做归一化就命中 <code>number</code> 原文时记为 exact；归一化后命中记为 normalized。两者分数不同只是为了让界面能解释"你输入的格式不对，但我们认出来了"。</li>
+<li><b>前缀 / 包含</b>：处理 <code>20443906-1</code>、<code>A0004201520/2</code> 这类带后缀变体。</li>
+<li><b>模糊</b>：PostgreSQL 用 <code>TrigramSimilarity(number_norm, q)</code> 排序，阈值 0.45（编号短，阈值不能太高）；名称检索对 <code>name_en</code> 与 Fitment 的 make / model 做 trigram 与 icontains 组合。</li>
+<li><b>排序</b>：先按 match_type 优先级，再按分数，再按完整度（数据全的排前面，销售更愿意直接用）。</li>
+</ul>
+
+<h3>7.3 quality（完整度评分）</h3>
+<div class="tbl"><table>
+<tr><th>项</th><th>权重</th><th>判定</th></tr>
+<tr><td>英文名称</td><td>10</td><td>name_en 非空且长度 ≥ 5</td></tr>
+<tr><td>分类</td><td>10</td><td>category 非空</td></tr>
+<tr><td>至少一个 OE 号</td><td>20</td><td>PartNumber(kind=OE) 存在</td></tr>
+<tr><td>至少一个 Cross</td><td>10</td><td>PartNumber(kind=CROSS) 存在</td></tr>
+<tr><td>至少一条适配车型</td><td>10</td><td>Fitment 存在</td></tr>
+<tr><td>主图</td><td>15</td><td>PartImage(is_primary=True) 存在</td></tr>
+<tr><td>分类要求的属性齐全</td><td>10</td><td>attribute_schema 中 required 键全部有值</td></tr>
+<tr><td>包装信息</td><td>5</td><td>packaging 含 pcs_per_carton 与毛重</td></tr>
+<tr><td>至少一条供应商报价</td><td>10</td><td>SupplierOffer 存在</td></tr>
+</table></div>
+<pre><code>apps/catalog/services/quality.py
+
+@dataclass
+class QualityReport:
+    score: int
+    missing: list[str]        # ["image", "oe", "fitment"]
+
+def evaluate(part: Part) -> QualityReport
+def recompute(parts: QuerySet[Part] | None = None) -> int   # 批量写回 completeness_score，返回条数
+def summary() -> dict                                       # 看板用：总数、分布、各缺失项计数、疑似重复数
+def duplicates() -> list[tuple[str, list[Part]]]            # 同 number_norm 指向多个 Part
+</code></pre>
+<p>评分在导入完成、建议采纳、后台保存时对受影响的 Part 显式重算；全量重算走管理命令。</p>
+
+<h3>7.4 llm（大模型封装）</h3>
+<pre><code>apps/ai/llm/base.py
+class LLMClient(Protocol):
+    def extract_json(self, *, prompt_name: str, variables: dict, schema: type[BaseModel]) -> tuple[BaseModel, AITask]
+    def generate_text(self, *, prompt_name: str, variables: dict) -> tuple[str, AITask]
+    def describe_image(self, *, prompt_name: str, image_bytes: bytes, variables: dict, schema: type[BaseModel]) -> tuple[BaseModel, AITask]
+
+apps/ai/llm/openai_compat.py   # openai.OpenAI(base_url=..., api_key=...)；chat.completions；response_format json_object；图片以 data URL 传 image_url
+apps/ai/llm/mock.py            # 从 prompts/&lt;name&gt;.example.json 读固定输出，延迟 300ms，标注 model="mock"
+apps/ai/llm/factory.py         # get_client() 按 settings.LLM_PROVIDER 返回实例；测试固定 mock
+apps/ai/prompts/loader.py      # 读取 prompts/&lt;name&gt;.md：front matter（description、model_hint、temperature）+ 模板正文，用 str.format_map 填充
+</code></pre>
+<ul>
+<li><b>每次调用产生一条 AITask</b>：prompt_name、model、input_digest（sha256 前 16 位）、input_preview（前 500 字）、output、prompt_tokens、completion_tokens、latency_ms、status（ok / invalid_json / error）、error。</li>
+<li><b>JSON 解析失败</b>：重试一次并在提示中附上错误；再失败则 status=invalid_json，业务侧生成低置信度建议或提示人工处理，绝不抛到页面 500。</li>
+<li><b>超时与重试</b>：客户端超时 60 秒，SDK 自带 2 次重试；批量任务里单条失败不影响整批。</li>
+<li><b>提供商配置</b>：</li>
+</ul>
+<div class="tbl"><table>
+<tr><th>提供商</th><th>LLM_BASE_URL</th><th>文本模型示例</th><th>视觉模型示例</th><th>备注</th></tr>
+<tr><td>通义千问 DashScope</td><td><code>https://dashscope.aliyuncs.com/compatible-mode/v1</code></td><td><code>qwen-plus</code></td><td><code>qwen-vl-plus</code></td><td>文本与视觉同一接口，推荐作为默认</td></tr>
+<tr><td>DeepSeek</td><td><code>https://api.deepseek.com</code></td><td><code>deepseek-chat</code></td><td>无</td><td>文本便宜，视觉需另配 LLM_VISION_BASE_URL</td></tr>
+<tr><td>Kimi Moonshot</td><td><code>https://api.moonshot.cn/v1</code></td><td><code>moonshot-v1-32k</code></td><td><code>moonshot-v1-8k-vision-preview</code></td><td>长上下文适合 PDF 抽取</td></tr>
+<tr><td>mock</td><td>无</td><td><code>mock</code></td><td><code>mock</code></td><td>离线演示与测试</td></tr>
+</table></div>
+<p>模型名以各家当日文档为准，配置全部在 <code>.env</code>，代码不写死。视觉与文本允许配置不同的 base_url 与 key。</p>
+
+<h3>7.5 importer（导入）</h3>
+<pre><code>apps/importer/services/mapping.py
+  SYNONYMS: dict[str, list[str]]           # 标准字段 -> 表头同义词（见数据字典）
+  suggest_mapping(headers: list[str], sample_rows: list[dict]) -> dict[str, MappingSuggestion]
+      # 1. 表头归一化后查同义词表，命中即 source="synonym", confidence=1.0
+      # 2. 未命中的表头连同 3 行样例交给 LLM（prompt: column_mapping），source="ai"
+      # 3. 仍无法判断的标为 "ignore"
+
+apps/importer/services/loader.py
+  read_table(file) -> pandas.DataFrame       # 定位表头行、去空行、全部转 str、去首尾空白
+  dry_run(batch) -> ImportReport             # 逐行校验：必填、编号归一化、重复检测；不写库
+  execute(batch) -> ImportReport             # transaction.atomic；创建或更新 Part / PartNumber / SupplierOffer；写 ImportRow；触发 quality.recompute
+</code></pre>
+<p>更新规则：已 <code>verified=True</code> 的编号不被导入覆盖；同一 SKU 的非空字段"以新补空、不以新覆旧"，除非映射时勾选"覆盖"。</p>
+
+<h3>7.6 quoting 与 export</h3>
+<pre><code>apps/suppliers/services/quoting.py
+  best_offer(part) -> SupplierOffer | None           # 单价最低，同价取交期短
+  build_quote(inquiry, part, qty, margin=Decimal("0.25")) -> QuoteLine
+      # unit_price = cost * (1 + margin)，四舍五入两位；qty < moq 时在备注提示
+  quote_to_xlsx(inquiry) -> bytes
+
+apps/inquiries/services/export.py
+  to_alibaba_csv(parts) -> bytes ; to_shopify_csv(parts) -> bytes
+      # 只导出 status=reviewed 且有主图；返回被排除的 (sku, reason) 列表
+</code></pre>
+
+<h2 id="s8">8. 关键流程</h2>
+<h3>8.1 导入向导</h3>
+<ol>
+<li>用户上传文件，选择供应商。视图创建 <code>ImportBatch(status=uploaded)</code>，调用 <code>loader.read_table</code> 生成预览（前 20 行）与表头列表。</li>
+<li>视图调用 <code>mapping.suggest_mapping</code>，页面以表格展示每列的建议目标字段、来源与置信度，用户可改。提交后保存 <code>column_mapping</code>。</li>
+<li>点击"预检"，<code>loader.dry_run</code> 返回将新增 / 更新 / 跳过 / 无效的行数与明细，页面用 HTMX 局部展示。</li>
+<li>点击"导入"，<code>loader.execute</code> 在事务内写入，行数超过 500 时投递到 django-q2 后台执行，页面轮询状态。</li>
+<li>完成后跳转结果页：统计、疑似重复列表、逐行结果链接。</li>
+</ol>
+<h3>8.2 图片询价</h3>
+<ol>
+<li>上传图片，Pillow 校验并压缩到长边 1280、JPEG 质量 85，保存到 <code>media/inquiries/</code>，创建 <code>Inquiry(input_type=image)</code>。</li>
+<li>调用 <code>llm.describe_image(prompt_name="image_identify")</code>，得到 pydantic 对象 <code>ImageFinding(part_type, brand_hints, visible_numbers, description, confidence)</code>。</li>
+<li>对每个 <code>visible_numbers</code> 调用 <code>matcher.search</code>；若无编号，用 <code>part_type + brand_hints</code> 走名称检索。合并去重后展示候选与识别结果。</li>
+<li>用户点选候选，写入 <code>Inquiry.matched_part</code>，可继续生成报价单。</li>
+</ol>
+<h3>8.3 AI 补全与审核</h3>
+<ol>
+<li>产品页点击"AI 补全"，或列表多选后"批量补全"。单个同步执行，批量投递到 <code>ai.tasks.enrich_parts(part_ids)</code>。</li>
+<li>服务组装上下文（名称、分类、已有编号、适配、属性、同类已审核样例 2 条），调用 <code>extract_json(prompt_name="enrich_part", schema=EnrichResult)</code>。</li>
+<li>结果写入 <code>AISuggestion(status=pending)</code>，附 AITask。</li>
+<li>审核台逐条展示"当前值 vs 建议值"，采纳时逐字段写回 Part 并标 <code>source=ai</code>，重算完整度；拒绝时记录原因。</li>
+</ol>
+
+<h2 id="s9">9. 安全与数据治理</h2>
+<ul>
+<li><b>三字段治理</b>：所有可被 AI 或导入影响的实体带 <code>source</code>（manual / import / ai）、<code>confidence</code>（0–1）、<code>verified</code>（人工确认）。查询结果与导出按 verified 与 status 过滤。</li>
+<li><b>AI 不直接写业务字段</b>：只有 <code>AISuggestion.accept()</code> 这一条路径把 AI 内容写入 Part，代码评审时可以 grep 检查。</li>
+<li><b>上传校验</b>：扩展名白名单、大小上限、Excel 用 <code>openpyxl(data_only=True)</code> 不执行公式、图片用 Pillow <code>verify()</code> 后重新编码保存、文件名改为 uuid。</li>
+<li><b>认证</b>：<code>LoginRequiredMiddleware</code> 全站登录；Admin 仅 staff；MVP 不做细粒度权限，但成本字段在模板中以一个 <code>can_view_cost</code> 上下文变量控制显示，为后续权限留口。</li>
+<li><b>密钥</b>：仅在 <code>.env</code>；<code>.env.example</code> 不含真实值；CI 用仓库 secrets。</li>
+<li><b>AI 数据外泄考虑</b>：送往大模型的内容只包含产品公开属性与供应商表头样例，不包含成本价与客户信息；提示词中明确"不要编造编号"。</li>
+</ul>
+
+<h2 id="s10">10. 测试策略</h2>
+<div class="tbl"><table>
+<tr><th>层</th><th>必须覆盖</th><th>工具</th></tr>
+<tr><td>services</td><td>normalize 的每种脏格式；matcher 三级各一例与排序；quality 权重与缺失项；mapping 同义词命中与 AI 回退；loader 的新增 / 更新 / 跳过 / 回滚；quoting 的取整与 MOQ 提示；export 的排除逻辑</td><td>pytest、factory_boy、参数化</td></tr>
+<tr><td>models</td><td>唯一约束触发；save() 归一化；QuerySet 方法</td><td>pytest-django</td></tr>
+<tr><td>views</td><td>每个页面 200；HTMX 局部返回；未登录 302；导入向导四步走通；审核采纳写回</td><td>Django test client</td></tr>
+<tr><td>llm</td><td>mock 客户端的全部提示词都有 example.json；openai_compat 用 respx 或 monkeypatch 模拟响应与 JSON 失败重试</td><td>pytest、monkeypatch</td></tr>
+<tr><td>性能</td><td>搜索结果页 SQL 条数上限；1 万 SKU 数据下搜索耗时（本地基准，不进 CI）</td><td>django_assert_max_num_queries</td></tr>
+</table></div>
+<p>测试默认用 <code>config.settings.test</code>：<code>LLM_PROVIDER=mock</code>、django-q2 <code>sync=True</code>、数据库按 <code>DATABASE_URL</code> 决定（CI 用 PostgreSQL，本地无 docker 时 SQLite）。依赖 trigram 的测试打 <code>@pytest.mark.postgres</code>，SQLite 下自动跳过。</p>
+
+<h2 id="s11">11. Git 约定与持续集成</h2>
+<h3>Git</h3>
+<ul>
+<li>单分支 <code>main</code>，每个里程碑恰好一次提交，提交后打轻量标签 <code>M01</code>…<code>M20</code>，审核者用 <code>git diff M06..M07</code> 看增量。</li>
+<li>Conventional Commits：<code>feat(catalog): add three-level matcher (M07)</code>、<code>chore: project skeleton (M01)</code>、<code>test(importer): ...</code>。正文列出验收命令与结果。</li>
+<li>提交前本地必须通过 <code>ruff check .</code> 与 <code>pytest -q</code>。</li>
+<li><code>.gitignore</code>：<code>.env</code>、<code>media/</code>、<code>staticfiles/</code>、<code>*.sqlite3</code>、<code>__pycache__/</code>、<code>.pytest_cache/</code>、<code>.ruff_cache/</code>。</li>
+<li>审核发现问题时，修复作为 <code>fix(...)</code> 的独立提交，不改写历史。</li>
+</ul>
+<h3>GitHub Actions</h3>
+<pre><code># .github/workflows/ci.yml
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: tpdc, POSTGRES_PASSWORD: tpdc, POSTGRES_DB: tpdc }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tpdc" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.test
+      DATABASE_URL: postgres://tpdc:tpdc@localhost:5432/tpdc
+      SECRET_KEY: ci-only
+      LLM_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: pip install -r requirements/local.txt
+      - run: ruff check .
+      - run: python manage.py check
+      - run: python manage.py makemigrations --check --dry-run
+      - run: pytest -q
+</code></pre>
+<p>pg_trgm 扩展由迁移里的 <code>TrigramExtension()</code> 创建，CI 的 postgres 镜像自带该扩展，无需额外 init。</p>
+
+<h2 id="s12">12. 配置与部署</h2>
+<h3>环境变量（.env.example）</h3>
+<pre><code>DJANGO_SETTINGS_MODULE=config.settings.local
+SECRET_KEY=change-me
+DEBUG=true
+ALLOWED_HOSTS=localhost,127.0.0.1
+DATABASE_URL=postgres://tpdc:tpdc@localhost:5432/tpdc   # 留空则使用 SQLite
+LLM_PROVIDER=openai_compatible                            # openai_compatible | mock
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_API_KEY=
+LLM_MODEL=qwen-plus
+LLM_VISION_BASE_URL=                                      # 留空则同 LLM_BASE_URL
+LLM_VISION_API_KEY=
+LLM_VISION_MODEL=qwen-vl-plus
+LLM_TIMEOUT_SECONDS=60
+COMPANY_SKU_PREFIX=FIT-
+DEFAULT_MARGIN=0.25
+</code></pre>
+<h3>本地开发</h3>
+<pre><code>docker compose up -d db
+python -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements/local.txt
+cp .env.example .env
+python manage.py migrate
+python manage.py createsuperuser
+python manage.py seed_demo            # 生成约 400 个 SKU 与一份乱格式 Excel 到 media/demo/
+python manage.py runserver
+python manage.py qcluster             # 另一个终端，后台任务
+</code></pre>
+<h3>演示机</h3>
+<pre><code>DJANGO_SETTINGS_MODULE=config.settings.production
+python manage.py collectstatic --noinput
+gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 2
+python manage.py qcluster
+</code></pre>
+<p>whitenoise 服务静态文件，媒体文件由 Django 在 DEBUG 关闭时通过一个受登录保护的视图返回（演示规模足够）。提供 <code>scripts/demo_up.sh</code> 一键执行上述步骤。</p>
+
+<h2 id="s13">13. 演进路线</h2>
+<div class="tbl"><table>
+<tr><th>阶段</th><th>内容</th><th>触发条件</th></tr>
+<tr><td>近期</td><td>互换组人工维护；PDF 目录表格抽取；供应商比价视图；权限（销售不可见成本）</td><td>演示通过、进入试用</td></tr>
+<tr><td>中期</td><td>pgvector + 多模态向量做以图搜图与语义检索；Alibaba / Shopify API 直连；询盘邮件自动解析入库</td><td>SKU 过万、图片询价占比高</td></tr>
+<tr><td>远期</td><td>AI 销售助手（基于询价留痕与产品库的问答）；供应商门户自助上传；多语言站点</td><td>数据完整度稳定在 90% 以上</td></tr>
+</table></div>
+
+<h2 id="appendix-prompts">附录 A：提示词全文</h2>
+<p>提示词文件放在 <code>apps/ai/prompts/</code>，格式为 Markdown 加 YAML front matter，正文用 <code>{变量}</code> 占位。每个提示词配一个 <code>&lt;name&gt;.example.json</code> 供 mock 与测试使用。所有提示词都要求输出 JSON，并明令"不知道就留空，不要编造编号"。</p>
+
+<h3>A.1 column_mapping.md（列映射）</h3>
+<pre><code>---
+description: 把供应商表头映射到标准字段
+temperature: 0
+---
+你是卡车配件数据整理助手。下面是一份供应商表格的表头和前几行样例。
+请把每一个表头映射到标准字段之一，无法判断的映射为 "ignore"。
+
+标准字段及含义：
+- sku: 我方内部料号（通常以 {sku_prefix} 开头）
+- oe_number: 主机厂原厂号（OE / OEM）
+- cross_number: 其他品牌互换号（Cross / Ref / Interchange / Replaces）
+- supplier_pn: 供应商自己的料号
+- name_en: 英文品名
+- name_zh: 中文品名
+- category: 分类
+- brand: 编号所属品牌（Volvo / Scania / Knorr ...）
+- make, model, engine, year_from, year_to: 适配车型
+- unit_cost: 单价（数字）
+- currency: 币种
+- moq: 最小起订量
+- lead_days: 交期（天）
+- pcs_per_carton, carton_l_cm, carton_w_cm, carton_h_cm, gross_weight_kg, net_weight_kg: 包装
+- image_url: 图片链接
+- description_en: 英文描述
+- ignore: 无法判断或无用
+
+表头：{headers}
+样例行（JSON 数组）：{sample_rows}
+
+只输出 JSON，格式：
+{{"mapping": [{{"header": "原表头", "field": "标准字段", "confidence": 0.0到1.0, "reason": "一句话"}}]}}
+</code></pre>
+
+<h3>A.2 extract_fields.md（从非结构化文本提取字段）</h3>
+<pre><code>---
+description: 从供应商目录 / PDF 文本 / 邮件片段提取产品记录
+temperature: 0
+---
+你是卡车配件数据提取助手。从下面的文本中提取产品记录。
+规则：
+1. 只提取文本里明确出现的内容，不要推测或补全编号。
+2. 编号保持原样，不要改写格式。
+3. 同一产品的多个 OE 号放在数组里。
+4. 不确定的字段留 null。
+
+文本：
+{text}
+
+只输出 JSON：
+{{"records": [{{"name_en": "", "name_zh": null, "oe_numbers": [], "cross_numbers": [], "supplier_pn": null,
+  "brand_hints": [], "fitment": [{{"make": "", "model": "", "engine": null}}],
+  "unit_cost": null, "currency": null, "moq": null, "lead_days": null, "notes": null}}]}}
+</code></pre>
+
+<h3>A.3 enrich_part.md（产品文案与属性补全）</h3>
+<pre><code>---
+description: 为一个 SKU 生成英文标题、描述、关键词、卖点、FAQ，并建议分类与属性
+temperature: 0.4
+---
+你是卡车配件跨境电商的产品内容专家，服务对象是海外 B2B 采购商。
+根据已知数据为该 SKU 生成内容。要求：
+- 只使用给定的数据，不要新增任何编号或车型；不知道的属性留 null。
+- 标题 ≤ 80 字符，包含零件类型、主要适配品牌、一个 OE 号。
+- 描述 120–200 词，段落式，说明用途、适配、质量与包装。
+- 关键词 8–12 个，逗号分隔，面向 Alibaba 搜索。
+- 卖点 4 条，每条 ≤ 15 词。
+- FAQ 3 条，围绕适配确认、MOQ、质保。
+- 分类从给定列表中选；属性按该分类的 schema 填。
+
+已知数据：
+SKU: {sku}
+名称: {name_en} / {name_zh}
+当前分类: {category}
+可选分类: {category_options}
+分类属性 schema: {attribute_schema}
+OE 号: {oe_numbers}
+Cross: {cross_numbers}
+适配: {fitments}
+已有属性: {attributes}
+同类已审核样例: {examples}
+
+只输出 JSON：
+{{"title_en": "", "description_en": "", "keywords": [], "selling_points": [], "faq": [{{"q": "", "a": ""}}],
+  "category": "", "attributes": {{}}, "confidence": 0.0}}
+</code></pre>
+
+<h3>A.4 image_identify.md（图片识别）</h3>
+<pre><code>---
+description: 识别零件照片的类型、品牌线索与可见编号
+temperature: 0
+---
+你是卡车配件识别助手。观察这张照片，回答：
+1. 这是什么类型的零件（用英文通用名，如 brake pad, air filter, clutch disc, shock absorber）。
+2. 照片上是否有可见的编号、标签或铸字，逐字抄录，不要猜测看不清的字符，看不清的位置用 "?" 代替。
+3. 有哪些品牌线索（logo、颜色、包装文字）。
+4. 一句话描述外观特征（形状、接口、材质）。
+如果图片不是汽车零件，part_type 填 "unknown"。
+
+只输出 JSON：
+{{"part_type": "", "visible_numbers": [], "brand_hints": [], "description": "", "confidence": 0.0}}
+</code></pre>
+
+<h2 id="appendix-settings">附录 B：关键配置片段</h2>
+<pre><code># config/settings/base.py（节选）
+import environ
+env = environ.Env(DEBUG=(bool, False))
+BASE_DIR = Path(__file__).resolve().parents[2]
+environ.Env.read_env(BASE_DIR / ".env")
+
+INSTALLED_APPS = [
+    "django.contrib.admin", "django.contrib.auth", "django.contrib.contenttypes",
+    "django.contrib.sessions", "django.contrib.messages", "django.contrib.staticfiles",
+    "django.contrib.postgres",
+    "django_htmx", "django_q",
+    "apps.core", "apps.users", "apps.catalog", "apps.suppliers",
+    "apps.inquiries", "apps.importer", "apps.ai",
+]
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.auth.middleware.LoginRequiredMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
+]
+AUTH_USER_MODEL = "users.User"
+DATABASES = {"default": env.db("DATABASE_URL", default=f"sqlite:///{BASE_DIR}/db.sqlite3")}
+Q_CLUSTER = {"name": "tpdc", "orm": "default", "workers": 2, "timeout": 300, "retry": 360, "sync": False}
+LLM_PROVIDER = env("LLM_PROVIDER", default="mock")
+LLM_BASE_URL = env("LLM_BASE_URL", default="")
+LLM_API_KEY = env("LLM_API_KEY", default="")
+LLM_MODEL = env("LLM_MODEL", default="mock")
+LLM_VISION_BASE_URL = env("LLM_VISION_BASE_URL", default="") or LLM_BASE_URL
+LLM_VISION_API_KEY = env("LLM_VISION_API_KEY", default="") or LLM_API_KEY
+LLM_VISION_MODEL = env("LLM_VISION_MODEL", default="mock")
+LLM_TIMEOUT_SECONDS = env.int("LLM_TIMEOUT_SECONDS", default=60)
+COMPANY_SKU_PREFIX = env("COMPANY_SKU_PREFIX", default="FIT-")
+DEFAULT_MARGIN = Decimal(env("DEFAULT_MARGIN", default="0.25"))
+LANGUAGE_CODE = "zh-hans"; TIME_ZONE = "Asia/Shanghai"; USE_TZ = True
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024
+</code></pre>
+</main>
+<footer class="site">系统设计文档 v1.0 · 演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>

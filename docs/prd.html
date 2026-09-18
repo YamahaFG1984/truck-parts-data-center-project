@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>产品需求文档 · 卡车配件 AI 产品数据中心</title>
+<meta name="description" content="卡车配件 AI 产品数据库 MVP 的产品需求文档：目标、角色、用户故事、验收标准、范围与指标。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a class="active" href="prd.html">PRD</a>
+    <a href="architecture.html">架构设计</a>
+    <a href="data-dictionary.html">数据字典</a>
+    <a href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>产品需求文档（PRD）</h1>
+<p class="lede">卡车配件 AI 产品数据中心 · MVP · 产品经理视角</p>
+<p class="meta">版本 v1.0 · 2026-09-18 · 状态：已评审，进入施工</p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#s1">背景与目标</a></li>
+<li><a href="#s2">岗位职责与系统功能对照</a></li>
+<li><a href="#s3">用户与角色</a></li>
+<li><a href="#s4">核心概念词典</a></li>
+<li><a href="#s5">用户故事与验收标准</a></li>
+<li><a href="#s6">功能需求明细</a></li>
+<li><a href="#s7">非功能需求</a></li>
+<li><a href="#s8">范围边界：做与不做</a></li>
+<li><a href="#s9">成功指标</a></li>
+<li><a href="#s10">演示脚本</a></li>
+<li><a href="#s11">已定决策与开放问题</a></li>
+</ol></div>
+
+<h2 id="s1">1. 背景与目标</h2>
+<h3>1.1 公司现状</h3>
+<p>公司是一家卡车配件出口外贸企业，产品覆盖欧系（Volvo、Scania、MAN、Mercedes-Benz、DAF、Iveco、Renault Trucks）、美系（Freightliner、Kenworth、Peterbilt、International）与中系（Sinotruk HOWO、Shacman、FAW、Dongfeng）重卡的常用易损件与结构件。销售通过 Alibaba、Shopify 独立站与官网获取询盘，采购从国内供应商处组织货源。</p>
+<h3>1.2 总经理描述的痛点</h3>
+<ul>
+<li><b>SKU 数量大。</b>数千到上万个料号，同一个零件在不同品牌、不同供应商处有不同编号。</li>
+<li><b>数据不全。</b>相当比例的 SKU 缺图片、缺 OE 号、缺适配车型、缺规格或缺价格，散落在供应商 Excel、PDF 目录、微信图片和销售个人的记忆里。</li>
+<li><b>响应慢。</b>客户发来一个 OE 号、一张照片或一句描述，销售需要翻多份表、问采购、问产品经理，数小时甚至数天才能回复"是什么、能不能配、多少钱"。</li>
+<li><b>期望。</b>建一个 AI 产品数据库，做到"从图片到功能再到价格"的快速响应。</li>
+</ul>
+<h3>1.3 MVP 目标</h3>
+<p>MVP 不是上线系统，而是一次向总经理的演示。它要证明三件事：</p>
+<ol>
+<li><b>懂业务。</b>理解 OE 号、Cross Reference、适配车型、供应商报价之间的关系，知道客户输入有多脏。</li>
+<li><b>能落地。</b>把岗位描述里的五块职责，做成一个可点击、可运行的工作流，而不是 PPT。</li>
+<li><b>懂边界。</b>AI 负责提取、映射、归类与文案；匹配永远基于公司自己的数据库；AI 产出永远带来源与置信度、先进待审核。</li>
+</ol>
+<h3>1.4 一句话定义</h3>
+<div class="note">一个以标准化产品数据为核心的内部系统：把供应商的乱格式资料导入成标准字段，持续度量数据完整度，让销售用一个搜索框（文字或图片）秒级得到产品、替代件、供应商成本与建议报价，并用 AI 生成平台上架文案。</div>
+
+<h2 id="s2">2. 岗位职责与系统功能对照</h2>
+<p>岗位描述里的五块职责，逐条对应到系统里的页面与 AI 介入点。</p>
+<div class="tbl"><table>
+<tr><th>岗位职责</th><th>系统功能</th><th>AI 介入点</th><th>人工确认点</th></tr>
+<tr><td>1. 产品数据整理与标准化：维护 SKU、OE、Cross、分类、规格、图片、包装、适配车型；把供应商资料整理成标准字段；排查重复、缺失、错误</td><td>F1 导入向导、F2 数据质量看板、F0 后台管理、<a href="data-dictionary.html">数据字典</a></td><td>列映射推断、字段提取、分类与属性推断</td><td>映射确认、导入前预检、待审核采纳</td></tr>
+<tr><td>2. 采购与供应商数据支持：供应商产品线、MOQ、交期、成本、包装；供应商料号与 SKU / OE / Cross 匹配；比价与历史报价归档</td><td>F6 供应商报价与一键报价单、F1 导入向导（供应商报价单导入）</td><td>报价单字段提取</td><td>供应商料号与 SKU 的映射确认</td></tr>
+<tr><td>3. AI 工具应用与数据处理：用 AI 做整理、提取、翻译、描述、清洗；测试匹配工具并记录错误；沉淀提示词、模板与 SOP</td><td>F5 AI 补全与审核、提示词库（<a href="architecture.html#appendix-prompts">架构文档附录</a>）、AI 调用审计</td><td>标题 / 描述 / 关键词 / 卖点 / FAQ 生成、翻译</td><td>逐条采纳或拒绝，记录拒绝原因</td></tr>
+<tr><td>4. 销售与客户询价支持：根据 OE 号、料号、图片、名称查找产品与替代件；整理询价记录；准备报价所需信息</td><td>F3 智能查询、F4 图片询价、F7 询价留痕、F6 一键报价单</td><td>图片识别（零件类型、可见编号）</td><td>候选件确认</td></tr>
+<tr><td>5. Alibaba / Shopify / 官网上架支持：基于标准数据上架；AI 生成英文标题、关键词、描述、卖点、属性与 FAQ；根据反馈持续优化</td><td>F8 平台上架导出、F5 AI 补全</td><td>平台文案生成</td><td>导出前审核状态过滤（仅导出"已审核"）</td></tr>
+</table></div>
+
+<h2 id="s3">3. 用户与角色</h2>
+<div class="cards">
+<div class="card"><h3>销售（主要用户）</h3><p><b>一天：</b>早上打开邮箱与 Alibaba 后台，有 15 条询盘，其中 6 条只给了 OE 号，3 条给了照片，2 条给了竞品编号。<b>需要：</b>把每条询盘在一分钟内变成"产品 + 替代件 + 价格"的回复。<b>今天的痛：</b>翻表、问人、等答案。</p></div>
+<div class="card"><h3>采购</h3><p><b>一天：</b>收到三家供应商的新报价单 Excel，格式各不相同。<b>需要：</b>把报价单导入系统，与现有 SKU 对上号，看出哪家更便宜、交期更短。<b>今天的痛：</b>手工对照，历史报价找不到。</p></div>
+<div class="card"><h3>产品经理 / 数据运营（本岗位）</h3><p><b>一天：</b>维护分类、属性、关键词与适配关系；看哪些 SKU 缺什么；审核 AI 生成的内容。<b>需要：</b>一个能看到全局数据健康度、能批量处理、能追溯来源的工作台。</p></div>
+<div class="card"><h3>总经理（演示对象）</h3><p><b>关心：</b>响应速度、数据资产是否沉淀、AI 是否靠谱、成本多少、多久能用。<b>不关心：</b>技术栈细节。</p></div>
+</div>
+
+<h2 id="s4">4. 核心概念词典</h2>
+<div class="tbl"><table>
+<tr><th>术语</th><th>英文</th><th>解释</th><th>示例</th></tr>
+<tr><td>SKU / 料号</td><td>SKU, internal part number</td><td>公司自己的内部编号，系统内唯一。岗位描述中称 "FIT SKU"。</td><td><code>FIT-BRK-00123</code></td></tr>
+<tr><td>OE 号</td><td>OE / OEM number</td><td>主机厂（整车厂）原厂零件号，客户询价最常用的身份。一个 SKU 可能对应多个 OE 号（不同车厂、不同年代）。</td><td>Volvo <code>20443906</code></td></tr>
+<tr><td>Cross Reference / 互换号</td><td>cross reference, interchange</td><td>其他品牌（副厂、第三方制造商、竞争对手）对同一零件的编号。用于"客户给了别家的号，我们有没有对应件"。</td><td>Knorr <code>K001234</code>，Renault <code>7420443906</code></td></tr>
+<tr><td>供应商料号</td><td>supplier part number</td><td>供应商内部对该零件的编号，用于下单与对账。</td><td><code>HB-2044</code></td></tr>
+<tr><td>适配车型</td><td>fitment / application</td><td>零件能装在哪些品牌、车系、发动机、年份的车上。</td><td>Volvo FH12 / D12 / 1993–2005</td></tr>
+<tr><td>归一化编号</td><td>normalized number</td><td>去掉空格、横杠、点等非字母数字字符并转大写后的编号。所有匹配都在归一化编号上进行。</td><td><code>A 000 420 15 20</code> → <code>A0004201520</code></td></tr>
+<tr><td>替代件</td><td>alternative / substitute</td><td>与目标件共享任一 OE 或 Cross 编号、或在同一互换组中的其他 SKU。</td><td>同一 OE 的两个不同品牌 SKU</td></tr>
+<tr><td>完整度</td><td>completeness score</td><td>一个 SKU 关键字段齐全程度的 0–100 评分。</td><td>缺图 -15，缺 OE -20</td></tr>
+<tr><td>来源 / 置信度</td><td>source / confidence</td><td>每条数据从哪来（人工、供应商文件、AI）以及可信程度。AI 来的数据默认未验证。</td><td>source=ai, confidence=0.82</td></tr>
+</table></div>
+
+<h2 id="s5">5. 用户故事与验收标准</h2>
+<p>功能编号 F0–F8。每条用户故事附 Given / When / Then 验收标准，作为施工进度表中对应里程碑的验收依据。</p>
+
+<h3>F0 后台管理（基线）</h3>
+<p><b>作为</b>数据运营，<b>我想要</b>一个能增删改查所有产品数据的后台，<b>以便</b>在任何功能出问题时都有兜底入口。</p>
+<ul>
+<li>Given 已登录的员工账号，When 打开后台，Then 能按 SKU、OE 号、名称搜索产品，能在产品页内联编辑编号、适配车型、图片。</li>
+<li>Given 一个产品，When 查看，Then 能看到完整度分数与缺失项列表。</li>
+</ul>
+
+<h3>F1 供应商数据导入向导</h3>
+<p><b>作为</b>数据运营或采购，<b>我想要</b>上传供应商的 Excel 或 CSV，系统自动猜出每列对应的标准字段，<b>以便</b>不用手工重排表格就能入库。</p>
+<ul>
+<li>Given 一份表头为 "Part No. / OEM NO / Ref / Description / MOQ / FOB Price" 的 Excel，When 上传，Then 预览前 20 行并给出每列到标准字段的建议映射，每个建议带来源（同义词表或 AI）。</li>
+<li>Given 建议映射，When 我修改其中一列并点击"预检"，Then 显示将新增、更新、跳过（重复）与无效（缺关键字段）的行数，并列出无效行原因。</li>
+<li>Given 预检通过，When 点击"导入"，Then 全部行在一个事务中写入；任一行异常时整批回滚并提示；导入批次可在后台查看每一行的原始值与处理结果。</li>
+<li>Given 同一个归一化 OE 号已存在于另一个 SKU，When 导入，Then 不覆盖，而是标记为"疑似重复"进入看板。</li>
+</ul>
+
+<h3>F2 数据质量看板</h3>
+<p><b>作为</b>数据运营，<b>我想要</b>看到全库数据的健康度，<b>以便</b>决定先补哪一块。</p>
+<ul>
+<li>Given 已有产品数据，When 打开看板，Then 显示 SKU 总数、完整度分布（0–40 / 40–70 / 70–90 / 90–100）、缺图 / 缺 OE / 缺分类 / 缺适配 / 缺供应商报价的数量，各数字可点击进入对应产品列表。</li>
+<li>When 打开"疑似重复"，Then 列出同一归一化编号指向多个 SKU 的情况，并可一键跳转合并（MVP 阶段合并在后台手工完成）。</li>
+<li>Given 导入或 AI 补全完成，When 刷新看板，Then 数字在 5 秒内更新（评分在写入时或批量重算后更新）。</li>
+</ul>
+
+<h3>F3 智能查询</h3>
+<p><b>作为</b>销售，<b>我想要</b>在一个搜索框里输入客户给的任何编号或名称，<b>以便</b>秒级得到产品、替代件与价格。</p>
+<ul>
+<li>Given 输入 <code>20443906</code>，When 搜索，Then 首位返回该 OE 对应的 SKU，标注匹配类型"精确"。</li>
+<li>Given 输入 <code>2044-3906</code>、<code>20 443 906</code> 或 <code>oe:20443906</code>，When 搜索，Then 结果与上一条一致，匹配类型"归一化"。</li>
+<li>Given 输入 <code>2044390</code>（少一位）或 <code>20443906A</code>，When 搜索，Then 返回相似候选并显示相似度，匹配类型"模糊"。</li>
+<li>Given 输入 <code>brake pad volvo</code>，When 搜索，Then 按名称与适配车型返回候选。</li>
+<li>Given 命中一个 SKU，When 查看结果卡片，Then 显示主图、名称、分类、规格、全部 OE / Cross 编号、适配车型、最低供应商成本、建议售价、替代件列表、完整度。</li>
+<li>When 任何搜索完成，Then 自动写入一条询价记录（F7）。</li>
+<li>Then 在 1 万个 SKU、5 万条编号规模下，单次搜索响应不超过 500 毫秒。</li>
+</ul>
+
+<h3>F4 图片询价</h3>
+<p><b>作为</b>销售，<b>我想要</b>上传客户发来的零件照片，<b>以便</b>在不知道编号的情况下找到候选产品。</p>
+<ul>
+<li>Given 一张带有可见编号的零件照片，When 上传，Then 系统给出零件类型、品牌线索、识别出的编号列表与一句描述，并自动用编号与类型调用智能查询，返回候选列表与置信度。</li>
+<li>Given 照片上没有编号，When 上传，Then 至少返回零件类型与描述，并按类型 + 关键词给出候选。</li>
+<li>Given 未配置大模型接口（mock 模式），When 上传，Then 页面仍能走通并返回示例结果，明确标注"演示模式"。</li>
+<li>Then 所有候选均标注"待确认"，销售点选后才写入询价记录的匹配结果。</li>
+</ul>
+
+<h3>F5 AI 补全与审核</h3>
+<p><b>作为</b>数据运营，<b>我想要</b>对一个或一批 SKU 让 AI 生成英文标题、描述、关键词、卖点、FAQ，并推断分类与属性，<b>以便</b>快速补齐数据，但不让 AI 直接改库。</p>
+<ul>
+<li>Given 一个只有名称与 OE 号的 SKU，When 点击"AI 补全"，Then 生成一条待审核建议，包含上述字段与置信度，原字段不变。</li>
+<li>Given 一条待审核建议，When 点击"采纳"，Then 对应字段写入产品，来源标记为 AI，审核人与时间留痕；When 点击"拒绝"并填写原因，Then 建议关闭，原因可被后续提示词优化使用。</li>
+<li>Given 选择 50 个 SKU 批量补全，When 提交，Then 任务在后台执行，页面显示进度，不阻塞其他操作。</li>
+<li>Then 每次 AI 调用记录提示词名称、模型、输入摘要、输出、token 用量、耗时与状态。</li>
+</ul>
+
+<h3>F6 供应商报价与一键报价单</h3>
+<p><b>作为</b>采购与销售，<b>我想要</b>看到每个 SKU 的多家供应商报价并一键生成客户报价单，<b>以便</b>比价与快速回复。</p>
+<ul>
+<li>Given 一个 SKU 有三家供应商报价，When 查看产品，Then 按单价升序显示供应商、供应商料号、单价、MOQ、交期、报价日期。</li>
+<li>Given 一条询价与数量，When 输入目标毛利并点击"生成报价单"，Then 报价 = 最低成本 × (1 + 毛利)，USD 保留两位小数，可导出 Excel，含图片、描述、规格、包装、替代件。</li>
+</ul>
+
+<h3>F7 询价留痕</h3>
+<p><b>作为</b>产品经理，<b>我想要</b>所有查询自动留痕，<b>以便</b>沉淀常见 OE、Cross、车型与客户需求。</p>
+<ul>
+<li>Given 任意一次智能查询或图片询价，Then 自动记录原始输入、输入类型、命中结果、时间、操作人。</li>
+<li>When 打开询价记录页，Then 可按时间、输入类型、是否命中筛选，并看到"最近 30 天未命中最多的输入"列表。</li>
+</ul>
+
+<h3>F8 平台上架导出</h3>
+<p><b>作为</b>销售或运营，<b>我想要</b>勾选 SKU 导出 Alibaba 与 Shopify 的上架模板，<b>以便</b>直接批量上传。</p>
+<ul>
+<li>Given 勾选 20 个 SKU，When 选择 "Alibaba" 导出，Then 生成 CSV，列顺序符合平台模板，标题、关键词、描述来自已审核字段。</li>
+<li>Given 其中有 SKU 尚未审核或缺主图，When 导出，Then 这些 SKU 被排除并在结果页列出原因。</li>
+</ul>
+
+<h2 id="s6">6. 功能需求明细</h2>
+<div class="tbl"><table>
+<tr><th>功能</th><th>页面 / 入口</th><th>输入</th><th>输出</th><th>边界与规则</th></tr>
+<tr><td>F0 后台管理</td><td><code>/admin/</code></td><td>员工账号</td><td>全模型 CRUD</td><td>仅 staff；产品页内联编号、适配、图片、报价；列表显示完整度徽标</td></tr>
+<tr><td>F1 导入向导</td><td><code>/import/</code> 四步：上传 → 映射 → 预检 → 结果</td><td>.xlsx / .xls / .csv ≤ 20 MB；供应商选择</td><td>导入批次、逐行结果、疑似重复列表</td><td>表头自动定位（前 10 行中非空列最多的一行）；同义词表优先，AI 只处理未命中的列；事务导入；不覆盖已验证字段</td></tr>
+<tr><td>F2 质量看板</td><td><code>/quality/</code></td><td>无</td><td>统计卡片、分布图、缺失项列表、疑似重复</td><td>评分权重见架构文档；数字可点击下钻</td></tr>
+<tr><td>F3 智能查询</td><td><code>/search/?q=</code>，首页搜索框</td><td>任意字符串；可选前缀 <code>oe:</code> <code>sku:</code> <code>name:</code></td><td>候选列表（匹配类型、分数）、产品卡片</td><td>精确 → 归一化 → 模糊三级；模糊阈值 0.45；最多 20 条；HTMX 局部刷新</td></tr>
+<tr><td>F4 图片询价</td><td><code>/inquiry/image/</code></td><td>jpg / png / webp ≤ 10 MB</td><td>识别结果 + 候选列表</td><td>图片经 Pillow 校验并压缩到长边 1280 后再送模型；mock 模式可用</td></tr>
+<tr><td>F5 AI 补全</td><td>产品页按钮；<code>/ai/review/</code> 审核台</td><td>单个或多选 SKU</td><td>待审核建议</td><td>永不直接写库；采纳留痕；批量走后台任务</td></tr>
+<tr><td>F6 报价</td><td>产品页；<code>/inquiry/&lt;id&gt;/quote/</code></td><td>数量、目标毛利</td><td>报价单页面与 Excel</td><td>USD 单币种；毛利默认 25%；无阶梯价</td></tr>
+<tr><td>F7 询价留痕</td><td><code>/inquiry/</code></td><td>自动</td><td>记录列表、未命中榜</td><td>保留原始输入原文</td></tr>
+<tr><td>F8 平台导出</td><td>产品列表多选 → 导出</td><td>SKU 集合、平台</td><td>CSV</td><td>只导出已审核且有主图的 SKU</td></tr>
+</table></div>
+
+<h2 id="s7">7. 非功能需求</h2>
+<div class="tbl"><table>
+<tr><th>类别</th><th>要求</th></tr>
+<tr><td>性能</td><td>搜索 ≤ 500 ms（1 万 SKU / 5 万编号）；5 千行导入 ≤ 60 s；页面首屏 ≤ 1 s（局域网）。</td></tr>
+<tr><td>可用性</td><td>无大模型接口时（mock 模式）所有页面可走通；PostgreSQL 不可用时可退回 SQLite 运行（模糊匹配退化）。</td></tr>
+<tr><td>可追溯</td><td>所有编号、适配、文案字段带 source / confidence / verified；AI 调用全量审计；导入批次逐行留痕。</td></tr>
+<tr><td>安全</td><td>全站登录；上传文件校验类型与大小；密钥仅存 .env；不执行 Excel 公式。</td></tr>
+<tr><td>部署</td><td>单机；docker 只跑 PostgreSQL；一条命令生成演示数据。</td></tr>
+<tr><td>界面</td><td>中文界面，英文数据字段；桌面优先，手机可读。</td></tr>
+<tr><td>成本</td><td>单次 AI 补全 ≤ 4 千 token；演示全流程 API 费用 ≤ 1 美元量级（按 DeepSeek / 千问价格估算）。</td></tr>
+</table></div>
+
+<h2 id="s8">8. 范围边界：做与不做</h2>
+<div class="cards">
+<div class="card ok"><h3>MVP 做</h3><ul><li>F0–F8 全部功能</li><li>合成演示数据（含故意的脏数据）</li><li>中文界面、USD 单币种</li><li>mock 模式与 SQLite 回退</li><li>单元测试与 CI</li></ul></div>
+<div class="card warn"><h3>明确不做（演进路线口头介绍）</h3><ul><li>向量检索与 CLIP 以图搜图（先用视觉大模型 + 文本匹配）</li><li>多语言站点与 i18n</li><li>细粒度权限与审批流（只有登录 + staff）</li><li>多币种、汇率、阶梯价</li><li>与 Alibaba / Shopify 的 API 直连（先导出 CSV）</li><li>PDF 目录的表格自动识别（只做文本提取 + AI 抽取，作为 F1 的可选输入）</li></ul></div>
+</div>
+
+<h2 id="s9">9. 成功指标</h2>
+<h3>演示阶段</h3>
+<div class="tbl"><table>
+<tr><th>指标</th><th>目标</th><th>如何展示</th></tr>
+<tr><td>五个演示场景全部走通</td><td>100%</td><td>现场操作</td></tr>
+<tr><td>OE 号到答复的时间</td><td>从"几小时"到 ≤ 5 秒</td><td>现场输入客户常见脏格式</td></tr>
+<tr><td>导入一份乱格式报价单</td><td>≤ 2 分钟，含人工确认</td><td>现场上传</td></tr>
+<tr><td>数据完整度</td><td>看板显示导入 + AI 补全前后的分布变化</td><td>看板对比</td></tr>
+<tr><td>AI 可追溯</td><td>任一 AI 字段可点开看到来源、置信度、审核人</td><td>产品页</td></tr>
+</table></div>
+<h3>上线后（供讨论）</h3>
+<ul>
+<li>询盘首次响应时间中位数下降 50% 以上。</li>
+<li>完整度 ≥ 90 的 SKU 占比三个月内达到 80%。</li>
+<li>每周新增已审核上架 SKU 数。</li>
+<li>未命中查询占比逐月下降（说明数据在补齐）。</li>
+</ul>
+
+<h2 id="s10">10. 演示脚本（5 分钟）</h2>
+<ol>
+<li><b>痛点复述（30 秒）。</b>打开看板：几百个 SKU，一半缺图，三成缺 OE，还有疑似重复。这就是今天的数据。</li>
+<li><b>导入（60 秒）。</b>上传一份供应商乱格式报价单，系统猜出列映射，我改一列，预检显示新增 / 更新 / 重复，导入。看板数字变化。</li>
+<li><b>查询（60 秒）。</b>输入客户发来的 <code>2044-3906</code>，秒出产品、三家供应商成本、建议售价、两个替代件。再输入一个少一位的号，展示模糊候选。</li>
+<li><b>图片（60 秒）。</b>上传一张刹车片照片，识别出类型与可见编号，给出候选，点选确认，生成报价单并导出 Excel。</li>
+<li><b>AI 补全与上架（60 秒）。</b>对一个缺描述的 SKU 点 AI 补全，进入审核台采纳，再导出 Alibaba CSV。强调：AI 只建议，人来定，每一步可追溯。</li>
+<li><b>收尾（30 秒）。</b>下一步路线与所需投入。</li>
+</ol>
+
+<h2 id="s11">11. 已定决策与开放问题</h2>
+<h3>已定</h3>
+<div class="tbl"><table>
+<tr><th>事项</th><th>决定</th><th>日期</th></tr>
+<tr><td>大模型接口</td><td>国内 OpenAI 兼容接口（DeepSeek / 通义千问 DashScope / Kimi），保留 mock</td><td>2026-09-18</td></tr>
+<tr><td>演示数据</td><td>全部合成，附一份乱格式供应商 Excel</td><td>2026-09-18</td></tr>
+<tr><td>数据库</td><td>PostgreSQL 16（docker），SQLite 回退</td><td>2026-09-18</td></tr>
+<tr><td>界面与币种</td><td>中文界面、英文字段、USD；报价 = 成本 × (1 + 毛利)</td><td>2026-09-18</td></tr>
+<tr><td>工期</td><td>一周以上，20 个里程碑逐个提交审核</td><td>2026-09-18</td></tr>
+</table></div>
+<h3>开放（演示后与公司确认）</h3>
+<ul>
+<li>公司现有 SKU 编码规则与分类树，是否沿用。</li>
+<li>供应商报价的保密范围：销售是否可见成本。</li>
+<li>Alibaba / Shopify 模板的具体列与必填项。</li>
+<li>大模型接口的采购与费用归口。</li>
+</ul>
+</main>
+<footer class="site">产品需求文档 v1.0 · 演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>

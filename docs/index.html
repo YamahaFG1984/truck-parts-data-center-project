@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>卡车配件 AI 产品数据中心 · 项目文档</title>
+<meta name="description" content="面向卡车配件出口企业的 AI 产品数据库 MVP：PRD、架构设计、数据字典、施工进度表与面试陈述。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a class="active" href="index.html">总览</a>
+    <a href="prd.html">PRD</a>
+    <a href="architecture.html">架构设计</a>
+    <a href="data-dictionary.html">数据字典</a>
+    <a href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>卡车配件 AI 产品数据中心 · MVP</h1>
+<p class="lede">把散落在供应商 Excel、PDF 和照片里的卡车配件数据，整理成一份标准、可追溯的产品数据库，让销售在几秒内回答客户的"这是什么件、能不能配、多少钱"。</p>
+<p class="meta">Django 5.2 · PostgreSQL 16 · HTMX · 国内 OpenAI 兼容大模型接口 · 文档版本 v1.0 · 2026-09-18</p>
+
+<div class="note">
+<b>项目定位。</b>这是一个用于向公司总经理演示的最小可行产品（MVP），目标是证明三件事：理解卡车配件行业的数据（OE 号、Cross Reference、适配车型、供应商）；能把岗位职责落成可运行的工作流；清楚 AI 在数据工作中的边界，即 AI 负责提取、映射与文案，匹配永远基于自家数据库，AI 产出永远先进待审核。
+</div>
+
+<h2>文档导航</h2>
+<div class="cards">
+  <div class="card"><h3><a href="prd.html">产品需求文档（PRD）</a></h3><p>产品经理视角。背景与目标、岗位职责与功能对照表、用户角色、八个核心功能的用户故事与验收标准、非功能需求、范围边界、成功指标、演示脚本。</p></div>
+  <div class="card"><h3><a href="architecture.html">系统设计文档</a></h3><p>架构师视角。总体架构、技术选型与取舍、Two Scoops 项目布局、Django 5.2 实践清单、数据模型与 ER 图、核心服务设计、关键流程、数据治理、测试、CI、部署、提示词附录。</p></div>
+  <div class="card"><h3><a href="data-dictionary.html">标准字段规范（数据字典）</a></h3><p>产品数据的每一个字段：类型、格式、必填级别、脏数据形态与清洗规则；各品牌 OE 号格式；供应商表头同义词表。这是岗位最核心的交付物。</p></div>
+  <div class="card"><h3><a href="schedule.html">施工进度表</a></h3><p>20 个里程碑，每个里程碑一次 git 提交、一次代码审核。每项含文件清单、验收命令、审核清单、推荐执行模型，以及给接手模型的驱动提示词。</p></div>
+  <div class="card"><h3><a href="pitch.html">面试陈述与预设问答</a></h3><p>3 分钟项目陈述、总经理可能追问的 10 个问题与回答要点、演示前检查清单。</p></div>
+</div>
+
+<h2>不同读者的阅读顺序</h2>
+<div class="tbl narrow"><table>
+<tr><th>读者</th><th>先读</th><th>再读</th><th>目的</th></tr>
+<tr><td>总经理 / 面试官</td><td><a href="pitch.html">面试陈述</a></td><td><a href="prd.html">PRD</a> 第 1、2、9 节</td><td>10 分钟内理解问题、方案与价值</td></tr>
+<tr><td>接手开发的模型或工程师</td><td><a href="schedule.html">施工进度</a> 的"交接说明"</td><td><a href="architecture.html">架构设计</a>、<a href="data-dictionary.html">数据字典</a></td><td>不依赖聊天上下文即可从任一里程碑继续</td></tr>
+<tr><td>代码审核者（项目作者本人）</td><td><a href="schedule.html">施工进度</a> 对应里程碑的审核清单</td><td>该里程碑的 git diff</td><td>每次只审 300 行以内的增量</td></tr>
+</table></div>
+
+<h2>里程碑进度</h2>
+<p class="meta">手工维护。每完成一个里程碑，把状态改为"已提交"并填上 commit 短哈希。</p>
+<div class="tbl narrow"><table>
+<tr><th>#</th><th>里程碑</th><th>状态</th><th>Commit</th></tr>
+<tr><td>M01</td><td>项目骨架与 settings 分层</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M02</td><td>PostgreSQL、自定义 User、CI</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M03</td><td>编号归一化服务</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M04</td><td>catalog 数据模型</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M05</td><td>Django Admin 后台</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M06</td><td>演示数据生成</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M07</td><td>三级匹配服务</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M08</td><td>智能查询页与产品详情页</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M09</td><td>suppliers 供应商与报价</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M10</td><td>数据完整度评分</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M11</td><td>数据质量看板</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M12</td><td>importer 上传与预览</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M13</td><td>LLM 封装、mock 与调用审计</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M14</td><td>列映射与导入执行</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M15</td><td>AI 补全与审核工作台</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M16</td><td>后台批量任务</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M17</td><td>图片询价</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M18</td><td>询价留痕与一键报价单</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M19</td><td>平台上架导出</td><td class="status">未开始</td><td></td></tr>
+<tr><td>M20</td><td>首页仪表盘、README、演示脚本</td><td class="status">未开始</td><td></td></tr>
+</table></div>
+
+<h2>发布到 GitHub Pages</h2>
+<ol>
+<li>仓库推送到 GitHub 后，进入 Settings → Pages。</li>
+<li>Source 选择 "Deploy from a branch"，Branch 选 <code>main</code>，目录选 <code>/docs</code>，保存。</li>
+<li>约一分钟后访问 <code>https://&lt;用户名&gt;.github.io/&lt;仓库名&gt;/</code>。所有文档使用相对链接，无需额外配置。</li>
+</ol>
+<p>本地预览：在仓库根目录运行下面的命令，然后打开 <code>http://localhost:8000/docs/</code>。</p>
+<pre><code>python3 -m http.server 8000</code></pre>
+</main>
+<footer class="site">卡车配件 AI 产品数据中心 · 项目文档 · 演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>
