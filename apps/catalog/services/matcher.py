@@ -103,7 +103,7 @@ def _as_typed(raw: str | None) -> str:
 
 def _exact(typed: str, norm: str) -> list[Candidate]:
     """Exact when the stored text equals what was typed; otherwise matched after normalizing."""
-    rows = PartNumber.objects.filter(number_norm=norm).select_related("part")
+    rows = PartNumber.objects.filter(number_norm=norm).select_related("part__category__parent")
     return [
         _candidate(pn, "exact", 1.0) if pn.number == typed else _candidate(pn, "normalized", 0.95)
         for pn in rows
@@ -121,7 +121,7 @@ def _prefix(norm: str, limit: int) -> list[Candidate]:
         )
         .filter(cond)
         .exclude(number_norm=norm)
-        .select_related("part")
+        .select_related("part__category__parent")
         .order_by("norm_len")[: limit * 3]
     )
     return [
@@ -146,7 +146,7 @@ def _fuzzy_trigram(norm: str, limit: int) -> list[Candidate]:
         .annotate(similarity=TrigramSimilarity("number_norm", norm))
         .filter(similarity__gte=FUZZY_THRESHOLD)
         .exclude(number_norm=norm)
-        .select_related("part")
+        .select_related("part__category__parent")
         .order_by("-similarity")[: limit * 3]
     )
     return [_candidate(pn, "fuzzy", pn.similarity) for pn in rows]
@@ -159,7 +159,7 @@ def _fuzzy_python(norm: str, limit: int) -> list[Candidate]:
             Q(number_norm__startswith=norm[:3]) | Q(number_norm__endswith=norm[-3:])
         )
         .exclude(number_norm=norm)
-        .select_related("part")[:POOL_LIMIT]
+        .select_related("part__category__parent")[:POOL_LIMIT]
     )
     scored = []
     for pn in pool:
@@ -171,12 +171,14 @@ def _fuzzy_python(norm: str, limit: int) -> list[Candidate]:
 
 def _by_sku(text: str, limit: int) -> list[Candidate]:
     typed = text.strip()
-    exact = Part.objects.filter(sku__iexact=typed).first()
+    exact = Part.objects.select_related("category__parent").filter(sku__iexact=typed).first()
     if exact:
         return [Candidate(exact, "exact", 1.0, exact.sku, "SKU")]
     return [
         Candidate(p, "prefix", 0.8, p.sku, "SKU")
-        for p in Part.objects.filter(sku__istartswith=typed).order_by("sku")[:limit]
+        for p in Part.objects.select_related("category__parent")
+        .filter(sku__istartswith=typed)
+        .order_by("sku")[:limit]
     ]
 
 
@@ -185,7 +187,7 @@ def _by_name(text: str, limit: int) -> list[Candidate]:
     tokens = [t for t in text.replace(",", " ").split() if t]
     if not tokens:
         return []
-    qs = Part.objects.all()
+    qs = Part.objects.select_related("category__parent")
     for token in tokens:
         brand = canonical_brand(token)
         cond = (
@@ -205,7 +207,8 @@ def _by_name(text: str, limit: int) -> list[Candidate]:
         from django.contrib.postgres.search import TrigramWordSimilarity
 
         rows = (
-            Part.objects.annotate(similarity=TrigramWordSimilarity(text, "name_en"))
+            Part.objects.select_related("category__parent")
+            .annotate(similarity=TrigramWordSimilarity(text, "name_en"))
             .filter(similarity__gte=NAME_THRESHOLD)
             .order_by("-similarity", "sku")[:limit]
         )

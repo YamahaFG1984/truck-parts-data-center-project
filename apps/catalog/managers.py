@@ -1,7 +1,7 @@
 """QuerySets for catalog models. Admin, services and views all go through these."""
 
 from django.db import models
-from django.db.models import Exists, OuterRef, Prefetch, Q
+from django.db.models import Exists, OuterRef, Prefetch, Q, prefetch_related_objects
 
 from .services.normalize import normalize_number
 
@@ -44,16 +44,27 @@ class PartQuerySet(models.QuerySet):
 
     def with_related(self):
         """Everything a part card shows, in a fixed number of queries."""
-        from .models import PartImage, PartNumber
+        return self.select_related("category__parent").prefetch_related(*card_prefetches())
 
-        return self.select_related("category").prefetch_related(
-            Prefetch(
-                "numbers",
-                queryset=PartNumber.objects.select_related("brand").order_by("kind", "number"),
-            ),
-            "fitments",
-            Prefetch("images", queryset=PartImage.objects.order_by("-is_primary", "id")),
-        )
+
+def card_prefetches() -> list:
+    """Related rows a part card or detail page needs: numbers+brand, fitments, images."""
+    from .models import PartImage, PartNumber
+
+    return [
+        Prefetch(
+            "numbers",
+            queryset=PartNumber.objects.select_related("brand").order_by("kind", "number"),
+        ),
+        "fitments",
+        Prefetch("images", queryset=PartImage.objects.order_by("-is_primary", "id")),
+    ]
+
+
+def prefetch_for_cards(parts: list) -> list:
+    """Attach card data to parts already in memory (e.g. from the matcher): 3 queries."""
+    prefetch_related_objects(parts, *card_prefetches())
+    return parts
 
 
 class PartNumberQuerySet(models.QuerySet):

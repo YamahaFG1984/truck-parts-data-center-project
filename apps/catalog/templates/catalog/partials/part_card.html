@@ -1,0 +1,40 @@
+{% load catalog_tags %}
+{% with image=part|primary_image oe=part|numbers_of_kind:"OE" cross=part|numbers_of_kind:"CROSS" %}
+<article class="mb-3 rounded-lg border border-slate-200 bg-white p-4 flex flex-col sm:flex-row gap-4">
+  <a href="{% url 'catalog:part_detail' part.sku %}" class="shrink-0">
+    {% if image %}
+      <img src="{{ image.image.url }}" alt="{{ part.name_en }}" loading="lazy"
+           class="w-full sm:w-36 h-28 object-cover rounded border border-slate-200">
+    {% else %}
+      <div class="w-full sm:w-36 h-28 rounded border border-dashed border-slate-300 flex items-center justify-center text-xs text-slate-400">暂无图片</div>
+    {% endif %}
+  </a>
+
+  <div class="flex-1 min-w-0">
+    <div class="flex flex-wrap items-center gap-2 mb-1">
+      {% if candidate %}{% match_badge candidate.match_type %}{% endif %}
+      {% if candidate.matched_number %}
+        <span class="text-xs text-slate-500">命中 {{ candidate.matched_kind }} <code class="bg-slate-100 px-1 rounded">{{ candidate.matched_number }}</code>{% if candidate.match_type != "exact" and candidate.match_type != "normalized" %} · 相似度 {{ candidate.score|floatformat:2 }}{% endif %}</span>
+      {% endif %}
+      <span class="ml-auto">{% score_badge part.completeness_score %}</span>
+    </div>
+
+    <h2 class="font-semibold text-slate-900 break-words">
+      <a href="{% url 'catalog:part_detail' part.sku %}" class="hover:text-blue-700">{{ part.sku }}</a>
+      <span class="font-normal">{{ part.name_en|default:part.name_zh }}</span>
+    </h2>
+    <p class="text-sm text-slate-500 mb-2">{{ part.category|default:"未分类" }}{% if part.name_zh %} · {{ part.name_zh }}{% endif %}</p>
+
+    <dl class="grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-1 text-sm">
+      <dt class="text-slate-500">OE 号</dt>
+      <dd class="break-words">{% for n in oe|slice:":4" %}<code class="mr-2">{{ n.number }}</code>{% if n.brand %}<span class="text-xs text-slate-400 mr-3">{{ n.brand }}</span>{% endif %}{% empty %}<span class="text-red-600">缺</span>{% endfor %}{% if oe|length > 4 %}<span class="text-xs text-slate-400">等 {{ oe|length }} 个</span>{% endif %}</dd>
+      <dt class="text-slate-500">互换号</dt>
+      <dd class="break-words">{% for n in cross|slice:":4" %}<code class="mr-2">{{ n.number }}</code>{% if n.brand %}<span class="text-xs text-slate-400 mr-3">{{ n.brand }}</span>{% endif %}{% empty %}<span class="text-slate-400">—</span>{% endfor %}</dd>
+      <dt class="text-slate-500">适配</dt>
+      <dd>{% for f in part.fitments.all|slice:":3" %}<span class="mr-3">{{ f }}</span>{% empty %}<span class="text-red-600">缺</span>{% endfor %}</dd>
+      <dt class="text-slate-500">成本 / 售价</dt>
+      <dd class="text-slate-400">暂无供应商报价</dd>
+    </dl>
+  </div>
+</article>
+{% endwith %}

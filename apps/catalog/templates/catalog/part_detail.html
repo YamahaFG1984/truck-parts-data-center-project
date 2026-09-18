@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load catalog_tags %}
+
+{% block title %}{{ part.sku }} · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3">
+  <a href="{% url 'catalog:search' %}" class="hover:text-blue-700">智能查询</a> / {{ part.sku }}
+</nav>
+
+<header class="flex flex-col sm:flex-row sm:items-start gap-3 mb-4">
+  <div class="flex-1 min-w-0">
+    <h1 class="text-2xl font-bold break-words">{{ part.sku }} <span class="font-normal">{{ part.name_en|default:part.name_zh }}</span></h1>
+    <p class="text-slate-500">{{ part.category|default:"未分类" }}{% if part.name_zh %} · {{ part.name_zh }}{% endif %}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 text-sm">
+    {% score_badge part.completeness_score %}
+    <span class="rounded bg-slate-200 px-2 py-0.5 text-xs">{{ part.get_status_display }}</span>
+    <span class="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">来源 {{ part.get_source_display }}{% if part.verified %} · 已确认{% endif %}</span>
+    {% if user.is_staff %}<a href="{% url 'admin:catalog_part_change' part.pk %}" class="text-blue-700 hover:underline">后台编辑</a>{% endif %}
+  </div>
+</header>
+
+<div class="grid gap-4 lg:grid-cols-3">
+  <section class="lg:col-span-1">
+    {% for image in part.images.all %}
+      <img src="{{ image.image.url }}" alt="{{ part.name_en }}" class="mb-2 w-full rounded border border-slate-200{% if not image.is_primary %} opacity-90{% endif %}">
+    {% empty %}
+      <div class="h-48 rounded border border-dashed border-slate-300 flex items-center justify-center text-sm text-slate-400">暂无图片</div>
+    {% endfor %}
+  </section>
+
+  <div class="lg:col-span-2 space-y-4">
+    <section class="rounded-lg border border-slate-200 bg-white p-4">
+      <h2 class="font-semibold mb-2">编号</h2>
+      <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-slate-500"><th class="py-1 pr-3">类型</th><th class="py-1 pr-3">编号</th><th class="py-1 pr-3">品牌</th><th class="py-1 hidden sm:table-cell">来源</th></tr></thead>
+        <tbody>
+        {% for n in part.numbers.all %}
+          <tr class="border-t border-slate-100">
+            <td class="py-1 pr-3">{{ n.get_kind_display }}</td>
+            <td class="py-1 pr-3"><code>{{ n.number }}</code>{% if n.number != n.number_norm %} <span class="text-xs text-slate-400">({{ n.number_norm }})</span>{% endif %}</td>
+            <td class="py-1 pr-3">{{ n.brand|default:"—" }}</td>
+            <td class="py-1 text-slate-500 hidden sm:table-cell">{{ n.get_source_display }}{% if n.verified %} · 已确认{% endif %}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="py-2 text-red-600">缺少编号</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </section>
+
+    <section class="rounded-lg border border-slate-200 bg-white p-4">
+      <h2 class="font-semibold mb-2">适配车型</h2>
+      {% if part.fitments.all %}
+      <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-slate-500"><th class="py-1 pr-3">品牌</th><th class="py-1 pr-3">车系</th><th class="py-1 pr-3">发动机</th><th class="py-1">年份</th></tr></thead>
+        <tbody>
+        {% for f in part.fitments.all %}
+          <tr class="border-t border-slate-100"><td class="py-1 pr-3">{{ f.make }}</td><td class="py-1 pr-3">{{ f.model|default:"—" }}</td><td class="py-1 pr-3">{{ f.engine|default:"—" }}</td><td class="py-1">{{ f.year_from|default:"" }}–{{ f.year_to|default:"至今" }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}<p class="text-sm text-red-600">缺少适配车型</p>{% endif %}
+    </section>
+
+    <section class="grid gap-4 sm:grid-cols-2">
+      <div class="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 class="font-semibold mb-2">规格</h2>
+        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+        {% for row in attribute_rows %}
+          <dt class="text-slate-500">{{ row.label }}</dt>
+          <dd>{% if row.value is None %}<span class="text-red-600">缺</span>{% elif row.value is True %}是{% elif row.value is False %}否{% else %}{{ row.value }} {{ row.unit }}{% endif %}</dd>
+        {% empty %}
+          <dd class="col-span-2 text-slate-400">暂无规格</dd>
+        {% endfor %}
+        </dl>
+      </div>
+      <div class="rounded-lg border border-slate-200 bg-white p-4">
+        <h2 class="font-semibold mb-2">包装</h2>
+        {% with p=part.packaging %}
+        {% if p %}
+        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+          {% if p.unit %}<dt class="text-slate-500">销售单位</dt><dd>{{ p.unit }}</dd>{% endif %}
+          {% if p.pcs_per_carton %}<dt class="text-slate-500">每箱数量</dt><dd>{{ p.pcs_per_carton }}</dd>{% endif %}
+          {% if p.carton_l_cm %}<dt class="text-slate-500">外箱尺寸</dt><dd>{{ p.carton_l_cm }} × {{ p.carton_w_cm }} × {{ p.carton_h_cm }} cm</dd>{% endif %}
+          {% if p.gross_weight_kg %}<dt class="text-slate-500">毛重</dt><dd>{{ p.gross_weight_kg }} kg</dd>{% endif %}
+        </dl>
+        {% else %}<p class="text-sm text-slate-400">暂无包装信息</p>{% endif %}
+        {% endwith %}
+      </div>
+    </section>
+
+    <section class="rounded-lg border border-slate-200 bg-white p-4">
+      <h2 class="font-semibold mb-2">供应商报价</h2>
+      <p class="text-sm text-slate-400">暂无供应商报价</p>
+    </section>
+
+    <section class="rounded-lg border border-slate-200 bg-white p-4">
+      <h2 class="font-semibold mb-2">英文描述</h2>
+      {% if part.description_en %}<p class="text-sm leading-relaxed">{{ part.description_en }}</p>{% else %}<p class="text-sm text-red-600">缺少英文描述</p>{% endif %}
+      {% if part.keywords %}<p class="mt-2 text-xs text-slate-500">关键词：{{ part.keywords|join:", " }}</p>{% endif %}
+    </section>
+  </div>
+</div>
+
+<section class="mt-6">
+  <h2 class="text-lg font-semibold mb-2">替代件 <span class="text-sm font-normal text-slate-500">共享任一 OE 号或互换号的其他产品</span></h2>
+  {% for alt in alternatives %}
+    {% include "catalog/partials/part_card.html" with part=alt candidate=None %}
+  {% empty %}
+    <p class="text-sm text-slate-400">暂无替代件</p>
+  {% endfor %}
+</section>
+{% endblock %}

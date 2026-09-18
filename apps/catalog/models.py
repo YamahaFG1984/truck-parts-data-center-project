@@ -113,6 +113,24 @@ class Part(TimeStampedModel, SourcedModel):
     def __str__(self):
         return f"{self.sku} {self.name_en or self.name_zh}".strip()
 
+    def attribute_rows(self) -> list[dict]:
+        """Spec values labelled from the category schema, in schema order; missing
+        required values are included with value None so the page can flag them."""
+        fields = self.category.schema.fields if self.category_id else []
+        rows = [
+            {"label": f.label, "value": self.attributes.get(f.key), "unit": f.unit or "",
+             "required": f.required}
+            for f in fields
+            if f.key in self.attributes or f.required
+        ]
+        known = {f.key for f in fields}
+        rows += [
+            {"label": key, "value": value, "unit": "", "required": False}
+            for key, value in self.attributes.items()
+            if key not in known
+        ]
+        return rows
+
     def clean(self):
         errors = {}
         try:

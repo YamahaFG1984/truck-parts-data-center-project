@@ -19,7 +19,7 @@
       <nav class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
         {# Links for features built in later milestones; they 404 until then. #}
         <a class="hover:text-blue-700" href="{% url 'core:home' %}">首页</a>
-        <a class="hover:text-blue-700" href="/search/">搜索</a>
+        <a class="hover:text-blue-700" href="{% url 'catalog:search' %}">搜索</a>
         <a class="hover:text-blue-700" href="/import/">导入</a>
         <a class="hover:text-blue-700" href="/quality/">看板</a>
         <a class="hover:text-blue-700" href="/ai/review/">审核</a>
