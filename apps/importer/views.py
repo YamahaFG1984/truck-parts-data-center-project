@@ -8,7 +8,8 @@ from django.views.generic.base import TemplateResponseMixin
 from apps.ai.schemas import STANDARD_FIELDS
 
 from .forms import UploadForm
-from .models import ImportBatch
+from .models import ImportBatch, ImportRow
+from .services.importing import RESULTS, ImportFailed, dry_run, execute
 from .services.loader import LoaderError, read_table
 from .services.mapping import FIELD_LABELS, suggest_mapping
 
@@ -137,7 +138,7 @@ class MappingView(TemplateResponseMixin, View):
         return redirect(self.success_url())
 
     def success_url(self):
-        return reverse("importer:mapping", args=[self.batch.pk])
+        return reverse("importer:dry_run", args=[self.batch.pk])
 
     def _context(self, mapping):
         samples = self.table.rows[:3]
@@ -147,3 +148,77 @@ class MappingView(TemplateResponseMixin, View):
         ]
         return {"batch": self.batch, "rows": rows, "overwrite": mapping.get("overwrite", False),
                 "field_labels": FIELD_LABELS, "steps": STEPS}
+
+
+RESULT_LABELS = dict(ImportRow.Result.choices)
+PROBLEM_RESULTS = ["invalid", "duplicate", "skipped"]
+SAMPLE_CHANGES = 20
+
+
+def _count_cards(counts: dict) -> list[tuple[str, str, int]]:
+    return [(key, RESULT_LABELS[key], counts.get(key, 0)) for key in RESULTS]
+
+
+class DryRunView(TemplateResponseMixin, View):
+    """Step 4: what the import will do, row by row, without writing anything."""
+
+    template_name = "importer/dry_run.html"
+
+    def get(self, request, pk):
+        batch = get_object_or_404(ImportBatch.objects.select_related("supplier"), pk=pk)
+        if not batch.column_mapping.get("columns"):
+            messages.info(request, "请先确认列映射。")
+            return redirect("importer:mapping", pk=pk)
+        if batch.status == ImportBatch.Status.DONE:
+            return redirect("importer:result", pk=pk)
+        try:
+            report = dry_run(batch)
+        except (LoaderError, FileNotFoundError) as exc:
+            messages.error(request, str(exc) or "文件已不存在。")
+            return redirect("importer:preview", pk=pk)
+        plans = report.plans
+        return self.render_to_response({
+            "batch": batch, "steps": STEPS, "cards": _count_cards(report.counts),
+            "problems": [p for p in plans if p.result in PROBLEM_RESULTS],
+            # Updates first: they say what gets added to parts we already have.
+            "changes": sorted(
+                (p for p in plans if p.result not in PROBLEM_RESULTS),
+                key=lambda p: p.result != "updated",
+            )[:SAMPLE_CHANGES],
+            "importable": sum(1 for p in plans if p.result in ("new", "updated")),
+        })
+
+
+class ExecuteView(View):
+    """POST only: run the import in one transaction."""
+
+    def post(self, request, pk):
+        batch = get_object_or_404(ImportBatch, pk=pk)
+        if batch.status == ImportBatch.Status.DONE:
+            return redirect("importer:result", pk=pk)
+        try:
+            report = execute(batch)
+        except ImportFailed as exc:
+            messages.error(request, str(exc))
+            return redirect("importer:dry_run", pk=pk)
+        counts = report.counts
+        messages.success(request, f"导入完成：新增 {counts['new']}，更新 {counts['updated']}。")
+        return redirect("importer:result", pk=pk)
+
+
+class ResultView(DetailView):
+    """Step 5: what happened to every row; filter with ?result=."""
+
+    template_name = "importer/result.html"
+    context_object_name = "batch"
+    queryset = ImportBatch.objects.select_related("supplier")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        rows = self.object.rows.select_related("part").order_by("row_no")
+        selected = self.request.GET.get("result")
+        if selected in RESULTS:
+            rows = rows.filter(result=selected)
+        context.update(steps=STEPS, rows=rows, selected=selected,
+                       cards=_count_cards(self.object.stats.get("result", {})))
+        return context

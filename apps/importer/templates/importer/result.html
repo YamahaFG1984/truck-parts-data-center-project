@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}导入结果 · {{ batch.original_name }}{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{% url 'importer:upload' %}" class="hover:text-blue-700">导入</a> / #{{ batch.pk }} / 结果</nav>
+<h1 class="text-2xl font-bold mb-1 break-all">{{ batch.original_name }}</h1>
+<p class="text-sm text-slate-500 mb-4">状态 {{ batch.get_status_display }}{% if batch.supplier %} · 供应商 {{ batch.supplier }}{% endif %} · 完整度已重新计算，<a href="{% url 'core:quality' %}" class="text-blue-700 hover:underline">去看板看变化</a></p>
+{% include "importer/_steps.html" with current=5 %}
+{% url 'importer:result' batch.pk as result_url %}
+{% include "importer/_cards.html" with cards=cards link=result_url %}
+{% if selected %}<p class="mb-2 text-sm"><a href="{{ result_url }}" class="text-blue-700 hover:underline">显示全部行</a></p>{% endif %}
+
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3">行</th><th class="py-2 px-3">结果</th><th class="py-2 px-3">产品</th><th class="py-2 px-3">说明</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr class="border-t border-slate-100 align-top">
+      <td class="py-1 px-3 text-slate-500">{{ row.row_no }}</td>
+      <td class="py-1 px-3 whitespace-nowrap">{{ row.get_result_display }}</td>
+      <td class="py-1 px-3 whitespace-nowrap">{% if row.part %}<a href="{% url 'catalog:part_detail' row.part.sku %}" class="text-blue-700 hover:underline">{{ row.part.sku }}</a>{% else %}—{% endif %}</td>
+      <td class="py-1 px-3">{{ row.message }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="4" class="py-4 text-center text-slate-400">没有记录。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

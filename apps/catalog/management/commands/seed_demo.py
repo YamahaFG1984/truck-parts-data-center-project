@@ -20,7 +20,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--reset",
             action="store_true",
-            help="先清空全部产品目录与供应商数据（产品、编号、适配、图片、分类、品牌、供应商、报价）再生成。",
+            help="先清空产品目录、供应商和导入记录（产品、编号、适配、图片、分类、品牌、供应商、报价、导入批次）再生成。",
         )
         parser.add_argument("--parts", type=int, default=400, help="产品数量，默认 400。")
         parser.add_argument(
@@ -31,14 +31,18 @@ class Command(BaseCommand):
         if Part.objects.exists() and not options["reset"]:
             raise CommandError("产品目录已有数据。确认要清空重建请加 --reset。")
 
-        # Suppliers depend on catalog, not the other way round: import at run time.
+        # Suppliers and importer depend on catalog, not the other way round: import at run time.
+        from apps.importer.models import ImportBatch
         from apps.suppliers.demo import reset_suppliers, seed_offers
 
         with transaction.atomic():
             if options["reset"]:
+                for batch in ImportBatch.objects.all():  # batches PROTECT their supplier
+                    batch.file.delete(save=False)
+                ImportBatch.objects.all().delete()
                 reset_catalog()
                 reset_suppliers()
-                self.stdout.write("已清空产品目录与供应商。")
+                self.stdout.write("已清空产品目录、供应商与导入记录。")
             result = seed_catalog(parts=options["parts"], seed=options["seed"])
             offers = seed_offers(seed=options["seed"])
             recompute()

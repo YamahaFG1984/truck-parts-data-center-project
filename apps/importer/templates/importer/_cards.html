@@ -1,0 +1,10 @@
+{# include with cards=[(key, label, count)] link=<url or empty> selected=<key> #}
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-5">
+  {% for key, label, count in cards %}
+  {% if link %}<a href="{{ link }}?result={{ key }}"{% else %}<div{% endif %}
+     class="rounded-lg border bg-white p-3 {% if selected == key %}border-blue-500{% else %}border-slate-200{% endif %}{% if link %} hover:border-blue-400{% endif %}">
+    <div class="text-xs text-slate-500">{{ label }}</div>
+    <div class="text-2xl font-bold {% if key == 'invalid' and count %}text-red-600{% elif key == 'duplicate' and count %}text-amber-600{% elif key == 'new' or key == 'updated' %}text-emerald-700{% endif %}">{{ count }}</div>
+  {% if link %}</a>{% else %}</div>{% endif %}
+  {% endfor %}
+</div>
