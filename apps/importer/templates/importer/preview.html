@@ -35,8 +35,7 @@
   </div>
 
   <div class="mt-5 flex flex-wrap items-center gap-3">
-    <button type="button" disabled class="rounded bg-slate-300 px-5 py-2 text-white cursor-not-allowed">下一步：确认列映射</button>
-    <span class="text-sm text-slate-500">列映射、预检与导入正在开发中。</span>
+    <a href="{% url 'importer:mapping' batch.pk %}" class="rounded bg-blue-700 px-5 py-2 text-white hover:bg-blue-800">下一步：确认列映射</a>
     <a href="{% url 'importer:upload' %}" class="text-sm text-blue-700 hover:underline">重新上传</a>
   </div>
 {% endif %}

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}列映射 · {{ batch.original_name }}{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{% url 'importer:upload' %}" class="hover:text-blue-700">导入</a> / <a href="{% url 'importer:preview' batch.pk %}" class="hover:text-blue-700">#{{ batch.pk }}</a> / 列映射</nav>
+<h1 class="text-2xl font-bold mb-1 break-all">{{ batch.original_name }}</h1>
+<p class="text-sm text-slate-500 mb-4">先用同义词表认表头，认不出的才交给 AI；每一列都可以改。来源和置信度会跟着导入的数据一起保存。</p>
+{% include "importer/_steps.html" with current=3 %}
+
+<form method="post">
+  {% csrf_token %}
+  <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-left text-slate-500">
+      <tr><th class="py-2 px-3">表头</th><th class="py-2 px-3 hidden md:table-cell">样例</th><th class="py-2 px-3">目标字段</th><th class="py-2 px-3">来源</th><th class="py-2 px-3 hidden sm:table-cell">说明</th></tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      <tr class="border-t border-slate-100 align-top">
+        <td class="py-2 px-3 font-medium whitespace-nowrap">{{ row.header }}</td>
+        <td class="py-2 px-3 hidden md:table-cell text-slate-500">{% for s in row.samples %}<div class="truncate max-w-[14rem]">{{ s|default:"·" }}</div>{% endfor %}</td>
+        <td class="py-2 px-3">
+          <select name="field_{{ row.index }}" class="rounded border border-slate-300 px-2 py-1 {% if row.field == 'ignore' %}text-slate-400{% endif %}">
+            {% for value, label in field_labels.items %}<option value="{{ value }}"{% if value == row.field %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </td>
+        <td class="py-2 px-3 whitespace-nowrap">
+          {% if row.source == "synonym" %}<span class="rounded bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs">同义词</span>
+          {% elif row.source == "ai" %}<span class="rounded bg-violet-100 text-violet-800 px-2 py-0.5 text-xs">AI</span>
+          {% elif row.source == "manual" %}<span class="rounded bg-blue-100 text-blue-800 px-2 py-0.5 text-xs">人工</span>
+          {% else %}<span class="rounded bg-slate-200 text-slate-600 px-2 py-0.5 text-xs">未识别</span>{% endif %}
+          <span class="text-xs text-slate-500 ml-1">{{ row.confidence|floatformat:2 }}</span>
+        </td>
+        <td class="py-2 px-3 hidden sm:table-cell text-slate-500">{{ row.reason }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+
+  <label class="mt-4 flex items-start gap-2 text-sm">
+    <input type="checkbox" name="overwrite"{% if overwrite %} checked{% endif %} class="mt-1">
+    <span>用表格里的值<b>覆盖</b>已有产品的品名、描述、分类、包装（默认只补空，不覆盖）。已人工确认的产品和编号始终不会被改动。</span>
+  </label>
+
+  <div class="mt-5 flex flex-wrap items-center gap-3">
+    <button type="submit" class="rounded bg-blue-700 px-5 py-2 text-white hover:bg-blue-800">保存映射</button>
+    <button type="submit" name="reset" value="1" class="text-sm text-slate-600 hover:text-blue-700">重新推荐</button>
+  </div>
+</form>
+{% endblock %}

@@ -1,10 +1,16 @@
 from django.contrib import messages
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.views import View
 from django.views.generic import DetailView, FormView
+from django.views.generic.base import TemplateResponseMixin
+
+from apps.ai.schemas import STANDARD_FIELDS
 
 from .forms import UploadForm
 from .models import ImportBatch
 from .services.loader import LoaderError, read_table
+from .services.mapping import FIELD_LABELS, suggest_mapping
 
 PREVIEW_ROWS = 20
 RECENT_BATCHES = 10
@@ -71,3 +77,73 @@ class PreviewView(DetailView):
             preview_limit=PREVIEW_ROWS,
         )
         return context
+
+
+def _read(batch: ImportBatch):
+    with batch.file.open("rb") as fh:
+        return read_table(fh, batch.original_name)
+
+
+class MappingView(TemplateResponseMixin, View):
+    """Step 3: confirm which standard field each column holds.
+
+    Suggestions are computed once (synonyms first, the LLM only for leftovers) and
+    stored on the batch, so reloading the page never calls the model again.
+    """
+
+    template_name = "importer/mapping.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        batches = ImportBatch.objects.select_related("supplier")
+        self.batch = get_object_or_404(batches, pk=kwargs["pk"])
+        try:
+            self.table = _read(self.batch)
+        except (LoaderError, FileNotFoundError) as exc:
+            messages.error(request, str(exc) or "文件已不存在。")
+            return redirect("importer:preview", pk=self.batch.pk)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        mapping = self.batch.column_mapping
+        if not mapping.get("columns"):
+            mapping = {"columns": suggest_mapping(self.table.headers, self.table.rows),
+                       "overwrite": False}
+            self.batch.column_mapping = mapping
+            self.batch.save(update_fields=["column_mapping", "updated_at"])
+        return self.render_to_response(self._context(mapping))
+
+    def post(self, request, *args, **kwargs):
+        if "reset" in request.POST:
+            self.batch.column_mapping = {}
+            self.batch.status = ImportBatch.Status.UPLOADED
+            self.batch.save(update_fields=["column_mapping", "status", "updated_at"])
+            messages.info(request, "已重新生成推荐。")
+            return redirect("importer:mapping", pk=self.batch.pk)
+
+        columns = self.batch.column_mapping.get("columns") or suggest_mapping(
+            self.table.headers, self.table.rows
+        )
+        for i, column in enumerate(columns):
+            chosen = request.POST.get(f"field_{i}", column["field"])
+            if chosen not in STANDARD_FIELDS:
+                messages.error(request, f"“{column['header']}”的目标字段无效。")
+                return self.render_to_response(self._context(self.batch.column_mapping))
+            if chosen != column["field"]:
+                column.update(field=chosen, source="manual", confidence=1.0, reason="人工指定")
+        self.batch.column_mapping = {"columns": columns, "overwrite": "overwrite" in request.POST}
+        self.batch.status = ImportBatch.Status.MAPPED
+        self.batch.save(update_fields=["column_mapping", "status", "updated_at"])
+        messages.success(request, "列映射已保存。")
+        return redirect(self.success_url())
+
+    def success_url(self):
+        return reverse("importer:mapping", args=[self.batch.pk])
+
+    def _context(self, mapping):
+        samples = self.table.rows[:3]
+        rows = [
+            column | {"index": i, "samples": [r.get(column["header"], "") for r in samples]}
+            for i, column in enumerate(mapping["columns"])
+        ]
+        return {"batch": self.batch, "rows": rows, "overwrite": mapping.get("overwrite", False),
+                "field_labels": FIELD_LABELS, "steps": STEPS}
