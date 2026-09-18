@@ -2,16 +2,19 @@ from django.contrib import messages
 from django.core.exceptions import ImproperlyConfigured
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
+from django.urls import reverse
 from django.views import View
 from django.views.generic import ListView
 
 from apps.catalog.models import Part
+from apps.core.jobs import start_job
 
 from .llm.base import LLMError
 from .models import AISuggestion
 from .services.enrich import enrich_part
 
 CARD = "ai/partials/suggestion.html"
+MAX_BATCH = 50
 
 
 def _card(request, suggestion=None, error="", part=None):
@@ -93,3 +96,20 @@ class RejectView(_ReviewAction):
     def act(self, suggestion, request):
         suggestion.reject(request.user, request.POST.get("reason", ""))
         return f"{suggestion.part.sku} 的建议已拒绝，原因已记录。"
+
+
+class EnrichBatchView(View):
+    """POST parts=<id>...: queue AI enrichment for up to MAX_BATCH parts."""
+
+    def post(self, request):
+        ids = [int(i) for i in request.POST.getlist("parts") if i.isdigit()]
+        ids = list(Part.objects.filter(pk__in=ids).values_list("pk", flat=True))[:MAX_BATCH]
+        if not ids:
+            messages.warning(request, "请先勾选要补全的产品。")
+            return redirect(request.POST.get("next") or "catalog:part_list")
+        job = start_job(
+            kind="enrich", title=f"批量 AI 补全 {len(ids)} 个产品",
+            func="apps.ai.tasks.enrich_parts", args=(ids,), total=len(ids), user=request.user,
+            result_url=reverse("ai:review_queue"),
+        )
+        return redirect("core:job", pk=job.pk)

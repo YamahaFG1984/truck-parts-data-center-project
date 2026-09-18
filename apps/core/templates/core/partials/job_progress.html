@@ -1,0 +1,18 @@
+<div id="job-{{ job.pk }}"{% if not job.finished %} hx-get="{% url 'core:job' job.pk %}" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}
+     class="rounded-lg border border-slate-200 bg-white p-5">
+  <div class="flex flex-wrap items-baseline gap-3 mb-3">
+    <span class="rounded px-2 py-0.5 text-xs {% if job.status == 'done' %}bg-emerald-100 text-emerald-800{% elif job.status == 'failed' %}bg-red-100 text-red-800{% elif job.status == 'running' %}bg-blue-100 text-blue-800{% else %}bg-slate-200 text-slate-600{% endif %}">{{ job.get_status_display }}</span>
+    <span class="text-sm text-slate-600">{% if job.total %}{{ job.done|add:job.failed }} / {{ job.total }}{% endif %}{% if job.failed %} · 失败 {{ job.failed }}{% endif %}</span>
+  </div>
+  <div class="h-3 rounded bg-slate-100 overflow-hidden mb-3" role="progressbar" aria-valuenow="{{ job.percent }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="h-full {% if job.status == 'failed' %}bg-red-400{% else %}bg-blue-600{% endif %} transition-all" style="width: {{ job.percent }}%"></div>
+  </div>
+  {% if worker_missing %}
+  <div class="mb-3 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+    后台任务未运行：任务已排队超过 10 秒还没有被处理。请在另一个终端启动
+    <code class="bg-white px-1 rounded">python manage.py qcluster</code>，页面会自动继续。
+  </div>
+  {% endif %}
+  {% if job.message %}<pre class="whitespace-pre-wrap text-xs text-slate-600 bg-slate-50 rounded p-3 max-h-60 overflow-auto">{{ job.message }}</pre>{% endif %}
+  {% if job.finished and job.result_url %}<a href="{{ job.result_url }}" class="mt-3 inline-block rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800">查看结果</a>{% endif %}
+</div>

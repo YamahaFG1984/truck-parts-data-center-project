@@ -6,6 +6,7 @@ from django.views.generic import DetailView, FormView
 from django.views.generic.base import TemplateResponseMixin
 
 from apps.ai.schemas import STANDARD_FIELDS
+from apps.core.jobs import start_job
 
 from .forms import UploadForm
 from .models import ImportBatch, ImportRow
@@ -14,6 +15,7 @@ from .services.loader import LoaderError, read_table
 from .services.mapping import FIELD_LABELS, suggest_mapping
 
 PREVIEW_ROWS = 20
+BACKGROUND_ROWS = 500  # larger imports run on the django-q2 worker
 RECENT_BATCHES = 10
 STEPS = ["上传", "预览", "列映射", "预检", "结果"]
 
@@ -196,6 +198,14 @@ class ExecuteView(View):
         batch = get_object_or_404(ImportBatch, pk=pk)
         if batch.status == ImportBatch.Status.DONE:
             return redirect("importer:result", pk=pk)
+        rows = batch.stats.get("rows", 0)
+        if rows > BACKGROUND_ROWS:
+            job = start_job(
+                kind="import", title=f"导入 {batch.original_name}（{rows} 行）",
+                func="apps.importer.tasks.execute_batch", args=(batch.pk,), total=rows,
+                user=request.user, result_url=reverse("importer:result", args=[pk]),
+            )
+            return redirect("core:job", pk=job.pk)
         try:
             report = execute(batch)
         except ImportFailed as exc:

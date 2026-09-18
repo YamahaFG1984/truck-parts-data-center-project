@@ -13,14 +13,22 @@
 </div>
 <p class="text-sm text-slate-500 mb-4">按完整度从低到高排列，最需要补的在最前面。</p>
 
+<form method="post" action="{% url 'ai:enrich_batch' %}" x-data="{ picked: 0 }">
+{% csrf_token %}
+<input type="hidden" name="next" value="{{ request.get_full_path }}">
+<div class="mb-3 flex flex-wrap items-center gap-3 text-sm">
+  <button type="submit" class="rounded bg-violet-700 px-4 py-1.5 text-white hover:bg-violet-800 disabled:bg-slate-300" :disabled="picked === 0">批量 AI 补全</button>
+  <span class="text-slate-500"><span x-text="picked">0</span> 个已选，每次最多 50 个；结果进 AI 审核台。</span>
+</div>
 <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
 <table class="w-full text-sm">
   <thead class="bg-slate-50 text-left text-slate-500">
-    <tr><th class="py-2 px-3">图</th><th class="py-2 px-3">SKU</th><th class="py-2 px-3">品名</th><th class="py-2 px-3 hidden sm:table-cell">分类</th><th class="py-2 px-3 hidden sm:table-cell">状态</th><th class="py-2 px-3">完整度</th></tr>
+    <tr><th class="py-2 px-3"><input type="checkbox" aria-label="全选本页" @change="document.querySelectorAll('input[name=parts]').forEach(b => b.checked = $event.target.checked); picked = document.querySelectorAll('input[name=parts]:checked').length"></th><th class="py-2 px-3">图</th><th class="py-2 px-3">SKU</th><th class="py-2 px-3">品名</th><th class="py-2 px-3 hidden sm:table-cell">分类</th><th class="py-2 px-3 hidden sm:table-cell">状态</th><th class="py-2 px-3">完整度</th></tr>
   </thead>
   <tbody>
   {% for part in parts %}
     <tr class="border-t border-slate-100">
+      <td class="py-1 px-3"><input type="checkbox" name="parts" value="{{ part.pk }}" aria-label="选择 {{ part.sku }}" @change="picked = document.querySelectorAll('input[name=parts]:checked').length"></td>
       <td class="py-1 px-3">{% if part.primary_images %}<img src="{{ part.primary_images.0.image.url }}" alt="" loading="lazy" class="h-9 w-12 object-cover rounded">{% else %}<span class="text-xs text-slate-400">无图</span>{% endif %}</td>
       <td class="py-1 px-3 whitespace-nowrap"><a href="{% url 'catalog:part_detail' part.sku %}" class="text-blue-700 hover:underline">{{ part.sku }}</a></td>
       <td class="py-1 px-3">{{ part.name_en|default:part.name_zh|default:"—" }}</td>
@@ -29,11 +37,12 @@
       <td class="py-1 px-3">{% score_badge part.completeness_score %}</td>
     </tr>
   {% empty %}
-    <tr><td colspan="6" class="py-6 text-center text-slate-400">没有符合条件的产品。</td></tr>
+    <tr><td colspan="7" class="py-6 text-center text-slate-400">没有符合条件的产品。</td></tr>
   {% endfor %}
   </tbody>
 </table>
 </div>
+</form>
 
 {% if is_paginated %}
 <nav class="mt-4 flex items-center gap-3 text-sm">
