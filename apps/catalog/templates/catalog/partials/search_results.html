@@ -1,6 +1,7 @@
 {% if q %}
   <p class="text-sm text-slate-500 mb-3">
     按{{ query_kind }}查询“<span class="font-medium text-slate-800">{{ q }}</span>”，找到 {{ candidates|length }} 条
+    {% if inquiry %}· 已记为<a href="{% url 'inquiries:detail' inquiry.pk %}" class="text-blue-700 hover:underline">询价 #{{ inquiry.pk }}</a>{% if inquiry.matched_part_id %}，<a href="{% url 'inquiries:quote' inquiry.pk %}" class="text-blue-700 hover:underline">生成报价单</a>{% endif %}{% endif %}
   </p>
   {% for candidate in candidates %}
     {% include "catalog/partials/part_card.html" with part=candidate.part %}

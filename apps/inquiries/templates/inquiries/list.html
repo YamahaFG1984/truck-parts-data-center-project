@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}询价记录 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<div class="flex flex-wrap items-baseline gap-3 mb-1">
+  <h1 class="text-2xl font-bold">询价记录</h1>
+  <span class="text-slate-500">共 {{ paginator.count }} 条</span>
+  <a href="{% url 'inquiries:image' %}" class="ml-auto rounded bg-blue-700 px-4 py-1.5 text-sm text-white hover:bg-blue-800">图片询价</a>
+</div>
+<p class="text-sm text-slate-500 mb-4">每次搜索和图片询价都会自动记录。边输入边搜索产生的半截输入默认隐藏{% if not params.all %}（<a href="?all=1" class="text-blue-700 hover:underline">显示全部</a>）{% endif %}。</p>
+
+<nav class="flex flex-wrap gap-2 mb-4 text-sm">
+  {% with t=params.type h=params.hit d=params.days %}
+  <a href="?" class="rounded-full px-3 py-1 {% if not t and not h and not d %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">全部</a>
+  <a href="?type=text" class="rounded-full px-3 py-1 {% if t == 'text' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">文字</a>
+  <a href="?type=image" class="rounded-full px-3 py-1 {% if t == 'image' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">图片</a>
+  <a href="?hit=no" class="rounded-full px-3 py-1 {% if h == 'no' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">未命中</a>
+  <a href="?hit=yes" class="rounded-full px-3 py-1 {% if h == 'yes' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">已命中</a>
+  <a href="?days=7" class="rounded-full px-3 py-1 {% if d == '7' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">近 7 天</a>
+  <a href="?days=30" class="rounded-full px-3 py-1 {% if d == '30' %}bg-blue-700 text-white{% else %}bg-slate-100 text-slate-600{% endif %}">近 30 天</a>
+  {% endwith %}
+</nav>
+
+<div class="grid gap-4 lg:grid-cols-3">
+  <section class="lg:col-span-2 overflow-x-auto rounded-lg border border-slate-200 bg-white">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3">#</th><th class="py-2 px-3">输入</th><th class="py-2 px-3">产品</th><th class="py-2 px-3 hidden sm:table-cell">状态</th><th class="py-2 px-3 hidden sm:table-cell">时间</th></tr></thead>
+      <tbody>
+      {% for i in inquiries %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1 px-3"><a href="{% url 'inquiries:detail' i.pk %}" class="text-blue-700 hover:underline">{{ i.pk }}</a></td>
+          <td class="py-1 px-3 break-all">{% if i.input_type == "image" %}<span class="text-slate-500">📷 照片</span>{% else %}{{ i.raw_input }}{% endif %}{% if i.superseded %} <span class="text-xs text-slate-400">（被接续）</span>{% endif %}</td>
+          <td class="py-1 px-3 whitespace-nowrap">{% if i.matched_part %}<a href="{% url 'catalog:part_detail' i.matched_part.sku %}" class="text-blue-700 hover:underline">{{ i.matched_part.sku }}</a>{% else %}<span class="text-red-600">未命中</span>{% endif %}</td>
+          <td class="py-1 px-3 hidden sm:table-cell">{{ i.get_status_display }}</td>
+          <td class="py-1 px-3 hidden sm:table-cell text-slate-500">{{ i.created_at|date:"m-d H:i" }} {{ i.created_by|default:"" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="py-6 text-center text-slate-400">没有记录。</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <aside class="rounded-lg border border-slate-200 bg-white p-4 self-start">
+    <h2 class="font-semibold mb-1">近 30 天未命中最多</h2>
+    <p class="text-xs text-slate-500 mb-3">客户在找、库里没有的号：下一步最该补的数据。同一个号的不同写法合并计数。</p>
+    <ol class="space-y-1 text-sm">
+      {% for row in unmatched %}
+      <li class="flex gap-2"><span class="text-slate-400 w-5">{{ forloop.counter }}</span><code class="flex-1 break-all">{{ row.example }}</code><span class="tabular-nums text-slate-600">{{ row.times }} 次</span></li>
+      {% empty %}
+      <li class="text-slate-400">暂无。</li>
+      {% endfor %}
+    </ol>
+  </aside>
+</div>
+
+{% if is_paginated %}
+<nav class="mt-4 flex items-center gap-3 text-sm">
+  {% if page_obj.has_previous %}<a class="text-blue-700 hover:underline" href="?{{ querystring }}{% if querystring %}&amp;{% endif %}page={{ page_obj.previous_page_number }}">上一页</a>{% endif %}
+  <span class="text-slate-500">第 {{ page_obj.number }} / {{ paginator.num_pages }} 页</span>
+  {% if page_obj.has_next %}<a class="text-blue-700 hover:underline" href="?{{ querystring }}{% if querystring %}&amp;{% endif %}page={{ page_obj.next_page_number }}">下一页</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

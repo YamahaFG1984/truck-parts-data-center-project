@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}报价单 · 询价 #{{ inquiry.pk }}{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{% url 'inquiries:list' %}" class="hover:text-blue-700">询价记录</a> / <a href="{% url 'inquiries:detail' inquiry.pk %}" class="hover:text-blue-700">#{{ inquiry.pk }}</a> / 报价单</nav>
+<h1 class="text-2xl font-bold mb-1">报价单 · {{ inquiry.matched_part.sku }}</h1>
+<p class="text-sm text-slate-500 mb-4">{{ inquiry.matched_part.name_en }}。单价 = 最低供应商成本 × (1 + 目标毛利)，美元，四舍五入到分；成本和价格在生成时锁定，之后报价变动不影响已生成的报价单。</p>
+
+<form method="post" class="rounded-lg border border-slate-200 bg-white p-4 mb-5 flex flex-wrap items-end gap-4">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="w-full text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+  {% for field in form %}
+  <label class="text-sm">
+    <span class="block text-slate-600 mb-1">{{ field.label }}</span>
+    <input type="{% if field.name == 'customer' %}text{% else %}number{% endif %}" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}"{% if field.name == 'margin_percent' %} step="0.1"{% endif %}
+           class="rounded border border-slate-300 px-3 py-1.5 {% if field.name == 'customer' %}w-56{% else %}w-28{% endif %}">
+    {% for error in field.errors %}<span class="block text-red-700">{{ error }}</span>{% endfor %}
+  </label>
+  {% endfor %}
+  <button type="submit" class="rounded bg-blue-700 px-4 py-2 text-white hover:bg-blue-800">加入报价单</button>
+</form>
+
+{% if lines %}
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white mb-4">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3">SKU</th><th class="py-2 px-3 text-right">数量</th>{% if can_view_cost %}<th class="py-2 px-3 text-right hidden sm:table-cell">成本</th><th class="py-2 px-3 text-right hidden sm:table-cell">毛利</th>{% endif %}<th class="py-2 px-3 text-right">单价 USD</th><th class="py-2 px-3 text-right">金额 USD</th><th class="py-2 px-3">备注</th></tr></thead>
+  <tbody>
+  {% for line in lines %}
+    <tr class="border-t border-slate-100">
+      <td class="py-1 px-3">{{ line.part.sku }}</td>
+      <td class="py-1 px-3 text-right tabular-nums">{{ line.qty }}</td>
+      {% if can_view_cost %}<td class="py-1 px-3 text-right tabular-nums hidden sm:table-cell">{{ line.unit_cost_usd }}<div class="text-xs text-slate-400">{{ line.offer.supplier|default:"" }}</div></td>
+      <td class="py-1 px-3 text-right tabular-nums hidden sm:table-cell">{% widthratio line.margin 1 100 %}%</td>{% endif %}
+      <td class="py-1 px-3 text-right tabular-nums">{{ line.unit_price_usd }}</td>
+      <td class="py-1 px-3 text-right tabular-nums">{{ line.amount_usd }}</td>
+      <td class="py-1 px-3 text-amber-700">{{ line.note }}</td>
+    </tr>
+  {% endfor %}
+  <tr class="border-t border-slate-200 font-semibold"><td class="py-2 px-3" colspan="{% if can_view_cost %}5{% else %}3{% endif %}">合计</td><td class="py-2 px-3 text-right tabular-nums">{{ total }}</td><td></td></tr>
+  </tbody>
+</table>
+</div>
+<a href="{% url 'inquiries:quote_xlsx' inquiry.pk %}" class="inline-block rounded bg-emerald-700 px-4 py-2 text-white hover:bg-emerald-800">下载 Excel 报价单</a>
+<span class="ml-2 text-sm text-slate-500">含图片、描述、编号、规格、包装、替代件{% if can_view_cost %}；另附内部成本页{% endif %}</span>
+{% endif %}
+{% endblock %}

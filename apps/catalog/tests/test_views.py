@@ -102,8 +102,9 @@ def test_search_with_full_page_of_results_stays_within_query_budget(
         _card_part(i)
 
     # session + user + matcher levels (2 here: L1 empty, L2 fills the page so L3 is
-    # skipped) + numbers + fitments + images + offers
-    with django_assert_max_num_queries(8):
+    # skipped) + numbers + fitments + images + offers = 8 reads, plus the one INSERT
+    # that logs the search as an inquiry (M18)
+    with django_assert_max_num_queries(9):
         response = user_client.get(SEARCH, {"q": "88880"})
 
     assert len(response.context["candidates"]) == MAX_RESULTS

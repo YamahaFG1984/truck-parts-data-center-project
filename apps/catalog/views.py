@@ -25,10 +25,18 @@ class SearchView(TemplateView):
         context = super().get_context_data(**kwargs)
         q = self.request.GET.get("q", "").strip()[:MAX_QUERY_LENGTH]
         candidates = search(q) if q else []
+        inquiry = None
+        if q:
+            # Figure A2: every search is logged as an inquiry (one INSERT). Imported at
+            # run time: inquiries depends on catalog, catalog never imports inquiries.
+            from apps.inquiries.services.logging import log_text_search
+
+            inquiry = log_text_search(q, candidates, self.request.user)
         prefetch_for_cards([c.part for c in candidates])
         context.update(
             q=q,
             candidates=candidates,
+            inquiry=inquiry,
             query_kind=_KIND_LABELS[detect_query_kind(q)] if q else None,
         )
         return context
