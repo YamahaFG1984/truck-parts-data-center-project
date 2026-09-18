@@ -88,3 +88,16 @@ figcaption{color:var(--muted);font-size:13.5px;margin-top:6px;text-align:center}
 .status{font-size:13px}
 footer.site{max-width:1040px;margin:0 auto;padding:0 16px 40px;color:var(--muted);font-size:13px}
 @media print{header.site{position:static}main{padding:0}h2{break-before:auto}.ms,.card{break-inside:avoid}}
+
+/* diagram additions */
+.svg-diagram .arrow.hi{stroke:var(--accent);stroke-width:2}
+.svg-diagram .box.good{fill:var(--ok-soft);stroke:var(--ok)}
+.svg-diagram .box.warn2{fill:var(--warn-soft);stroke:var(--warn)}
+.svg-diagram .box.bad2{fill:var(--bad-soft);stroke:var(--bad)}
+.svg-diagram .box.dec{fill:var(--warn-soft);stroke:var(--warn)}
+.svg-diagram .lane{fill:var(--code-bg);stroke:var(--line);stroke-width:1}
+.svg-diagram .lane-label{font-size:12px;fill:var(--muted);font-weight:600}
+.svg-diagram .life{stroke:var(--line);stroke-width:1;stroke-dasharray:3 3}
+.svg-diagram .band{fill:var(--accent-soft);opacity:.35}
+.svg-diagram .title{font-weight:600}
+.svg-diagram .legend{font-size:11px;fill:var(--muted)}

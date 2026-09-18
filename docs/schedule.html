@@ -44,6 +44,36 @@
 <h3>推荐执行模型</h3>
 <p><span class="tag opus">Opus</span> 逻辑重、需要判断与取舍的里程碑（匹配、映射、LLM 封装、图片询价、AI 补全）。<span class="tag codex">Codex / Sonnet</span> 规格已完全给定、以模板与配置为主的机械性里程碑。作者额度充裕时全部用 Opus 亦可；反之按标注分配可省约一半成本。</p>
 
+<!-- fig:s2 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="单个里程碑从读清单到审核通过的循环">
+<defs><marker id="s2-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="s2-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box " x="20" y="60" width="136" height="50" rx="8"/>
+<text x="88.0" y="90" text-anchor="middle">读清单 Mxx</text>
+<path class="arrow" d="M156,85 L166,85" marker-end="url(#s2-arr)"/>
+<rect class="box soft" x="166" y="60" width="136" height="50" rx="8"/>
+<text x="234.0" y="90" text-anchor="middle">实现（不越界）</text>
+<path class="arrow" d="M302,85 L312,85" marker-end="url(#s2-arr)"/>
+<rect class="box soft" x="312" y="60" width="136" height="50" rx="8"/>
+<text x="380.0" y="90" text-anchor="middle">跑验收命令</text>
+<path class="arrow" d="M448,85 L458,85" marker-end="url(#s2-arr)"/>
+<rect class="box " x="458" y="60" width="136" height="50" rx="8"/>
+<text x="526.0" y="90" text-anchor="middle">commit + tag + 进度</text>
+<path class="arrow" d="M594,85 L604,85" marker-end="url(#s2-arr)"/>
+<rect class="box " x="604" y="60" width="136" height="50" rx="8"/>
+<text x="672.0" y="90" text-anchor="middle">停下等审核</text>
+<path class="arrow" d="M740,85 L750,85" marker-end="url(#s2-arr)"/>
+<rect class="box good" x="750" y="60" width="136" height="50" rx="8"/>
+<text x="818.0" y="90" text-anchor="middle">下一个里程碑</text>
+<path class="arrow" d="M380,110 L380,140 L234,140 L234,110" marker-end="url(#s2-arr)" stroke-dasharray="5 4"/>
+<text x="307" y="156" text-anchor="middle" class="small">失败：修到通过</text>
+<path class="arrow" d="M672,110 L672,150 L250,150 L250,112" marker-end="url(#s2-arr)" stroke-dasharray="5 4"/>
+<text x="465" y="170" text-anchor="middle" class="small">审核有问题：fix(...) 独立提交，不改写历史</text>
+<text x="760" y="40" text-anchor="middle" class="small">每次新增 ≤ 300 行</text>
+</svg>
+<figcaption>图 S2 · 每个里程碑的工作循环。验收不过不能提交；审核不过用独立的修复提交，历史永远可追溯。</figcaption>
+</figure>
+<!-- /fig:s2 -->
 <h2 id="overview">里程碑总览</h2>
 <div class="tbl"><table>
 <tr><th>#</th><th>里程碑</th><th>对应功能</th><th>模型</th><th>工时</th><th>依赖</th></tr>
@@ -70,6 +100,111 @@
 </table></div>
 <p>依赖允许并行：M03 与 M02 可同时进行；M13 只依赖 M01，可在 M04–M12 期间穿插；M09 可在 M07 之前做。单人顺序执行时按编号即可。</p>
 
+<!-- fig:s1 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 980 360" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="20 个里程碑的依赖关系与推荐模型">
+<defs><marker id="s1-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="s1-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<path class="arrow" d="M116,180.0 L142,126.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M116,180.0 L142,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M116,180.0 L142,234.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M238,126.0 L264,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M238,180.0 L264,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M360,180.0 L386,126.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M360,180.0 L386,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M360,180.0 L386,234.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M360,180.0 L508,126.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M482,180.0 L508,126.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M482,234.0 L508,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M482,234.0 L508,234.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M604,126.0 L630,72.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M604,180.0 L630,126.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M604,234.0 L630,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M238,234.0 L630,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M604,180.0 L630,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M238,234.0 L630,234.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M604,180.0 L630,234.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M238,234.0 L630,288.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M604,126.0 L630,288.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M726,180.0 L752,126.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M726,234.0 L752,126.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M726,72.0 L752,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M482,234.0 L752,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M726,288.0 L752,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M726,234.0 L752,234.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M848,126.0 L874,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M848,180.0 L874,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M848,234.0 L874,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M726,126.0 L874,180.0" marker-end="url(#s1-arr)"/>
+<path class="arrow" d="M482,126.0 L874,180.0" marker-end="url(#s1-arr)"/>
+<rect class="box good" x="20" y="160.0" width="96" height="40" rx="6"/>
+<text x="68.0" y="178" text-anchor="middle" font-weight="600">M01</text>
+<text x="68.0" y="192" text-anchor="middle" class="small">骨架</text>
+<rect class="box good" x="142" y="106.0" width="96" height="40" rx="6"/>
+<text x="190.0" y="124" text-anchor="middle" font-weight="600">M02</text>
+<text x="190.0" y="138" text-anchor="middle" class="small">DB · User · CI</text>
+<rect class="box soft" x="142" y="160.0" width="96" height="40" rx="6"/>
+<text x="190.0" y="178" text-anchor="middle" font-weight="600">M03</text>
+<text x="190.0" y="192" text-anchor="middle" class="small">归一化</text>
+<rect class="box soft" x="142" y="214.0" width="96" height="40" rx="6"/>
+<text x="190.0" y="232" text-anchor="middle" font-weight="600">M13</text>
+<text x="190.0" y="246" text-anchor="middle" class="small">LLM 封装</text>
+<rect class="box good" x="264" y="160.0" width="96" height="40" rx="6"/>
+<text x="312.0" y="178" text-anchor="middle" font-weight="600">M04</text>
+<text x="312.0" y="192" text-anchor="middle" class="small">catalog 模型</text>
+<rect class="box good" x="386" y="106.0" width="96" height="40" rx="6"/>
+<text x="434.0" y="124" text-anchor="middle" font-weight="600">M05</text>
+<text x="434.0" y="138" text-anchor="middle" class="small">Admin</text>
+<rect class="box good" x="386" y="160.0" width="96" height="40" rx="6"/>
+<text x="434.0" y="178" text-anchor="middle" font-weight="600">M06</text>
+<text x="434.0" y="192" text-anchor="middle" class="small">seed</text>
+<rect class="box good" x="386" y="214.0" width="96" height="40" rx="6"/>
+<text x="434.0" y="232" text-anchor="middle" font-weight="600">M09</text>
+<text x="434.0" y="246" text-anchor="middle" class="small">suppliers</text>
+<rect class="box soft" x="508" y="106.0" width="96" height="40" rx="6"/>
+<text x="556.0" y="124" text-anchor="middle" font-weight="600">M07</text>
+<text x="556.0" y="138" text-anchor="middle" class="small">匹配</text>
+<rect class="box good" x="508" y="160.0" width="96" height="40" rx="6"/>
+<text x="556.0" y="178" text-anchor="middle" font-weight="600">M10</text>
+<text x="556.0" y="192" text-anchor="middle" class="small">评分</text>
+<rect class="box good" x="508" y="214.0" width="96" height="40" rx="6"/>
+<text x="556.0" y="232" text-anchor="middle" font-weight="600">M12</text>
+<text x="556.0" y="246" text-anchor="middle" class="small">上传预览</text>
+<rect class="box good" x="630" y="52.0" width="96" height="40" rx="6"/>
+<text x="678.0" y="70" text-anchor="middle" font-weight="600">M08</text>
+<text x="678.0" y="84" text-anchor="middle" class="small">搜索页</text>
+<rect class="box good" x="630" y="106.0" width="96" height="40" rx="6"/>
+<text x="678.0" y="124" text-anchor="middle" font-weight="600">M11</text>
+<text x="678.0" y="138" text-anchor="middle" class="small">看板</text>
+<rect class="box soft" x="630" y="160.0" width="96" height="40" rx="6"/>
+<text x="678.0" y="178" text-anchor="middle" font-weight="600">M14</text>
+<text x="678.0" y="192" text-anchor="middle" class="small">映射导入</text>
+<rect class="box soft" x="630" y="214.0" width="96" height="40" rx="6"/>
+<text x="678.0" y="232" text-anchor="middle" font-weight="600">M15</text>
+<text x="678.0" y="246" text-anchor="middle" class="small">AI 审核</text>
+<rect class="box soft" x="630" y="268.0" width="96" height="40" rx="6"/>
+<text x="678.0" y="286" text-anchor="middle" font-weight="600">M17</text>
+<text x="678.0" y="300" text-anchor="middle" class="small">图片询价</text>
+<rect class="box good" x="752" y="106.0" width="96" height="40" rx="6"/>
+<text x="800.0" y="124" text-anchor="middle" font-weight="600">M16</text>
+<text x="800.0" y="138" text-anchor="middle" class="small">批量任务</text>
+<rect class="box good" x="752" y="160.0" width="96" height="40" rx="6"/>
+<text x="800.0" y="178" text-anchor="middle" font-weight="600">M18</text>
+<text x="800.0" y="192" text-anchor="middle" class="small">留痕报价</text>
+<rect class="box good" x="752" y="214.0" width="96" height="40" rx="6"/>
+<text x="800.0" y="232" text-anchor="middle" font-weight="600">M19</text>
+<text x="800.0" y="246" text-anchor="middle" class="small">导出</text>
+<rect class="box good" x="874" y="160.0" width="96" height="40" rx="6"/>
+<text x="922.0" y="178" text-anchor="middle" font-weight="600">M20</text>
+<text x="922.0" y="192" text-anchor="middle" class="small">首页 README</text>
+<rect class="box soft" x="20" y="326" width="14" height="14" rx="3"/>
+<text x="40" y="337" text-anchor="start" class="legend">Opus（判断密集）</text>
+<rect class="box good" x="160" y="326" width="14" height="14" rx="3"/>
+<text x="180" y="337" text-anchor="start" class="legend">Codex / Sonnet（规格已定）</text>
+<text x="400" y="337" text-anchor="start" class="legend">同一列的里程碑互不依赖，可并行或任意顺序</text>
+</svg>
+<figcaption>图 S1 · 里程碑依赖图。箭头指向依赖它的里程碑；M13 大模型封装只依赖骨架，可以随时插进来做。</figcaption>
+</figure>
+<!-- /fig:s1 -->
 <h2 id="milestones">里程碑明细</h2>
 
 <div class="ms" id="m01"><div class="head"><h3>M01 · 项目骨架与 settings 分层</h3><span class="tag codex">Codex</span><span class="tag">2h</span><span class="tag">≤ 250 行</span></div><div class="body">

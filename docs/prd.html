@@ -48,6 +48,62 @@
 <li><b>响应慢。</b>客户发来一个 OE 号、一张照片或一句描述，销售需要翻多份表、问采购、问产品经理，数小时甚至数天才能回复"是什么、能不能配、多少钱"。</li>
 <li><b>期望。</b>建一个 AI 产品数据库，做到"从图片到功能再到价格"的快速响应。</li>
 </ul>
+<!-- fig:p2 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="询盘处理流程在有系统前后的对比">
+<defs><marker id="p2-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="p2-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="lane" x="10" y="10" width="880" height="170" rx="10"/>
+<text x="22" y="28" class="lane-label">今天：询盘靠翻表和问人</text>
+<rect class="box ext" x="30" y="80" width="110" height="50" rx="8"/>
+<text x="85.0" y="102" text-anchor="middle">客户</text>
+<text x="85.0" y="118" text-anchor="middle" class="small">发来一个号 / 一张图</text>
+<rect class="box " x="180" y="80" width="110" height="50" rx="8"/>
+<text x="235.0" y="110" text-anchor="middle">销售</text>
+<path class="arrow" d="M140,105 L180,105" marker-end="url(#p2-arr)"/>
+<rect class="box warn2" x="340" y="34" width="170" height="40" rx="8"/>
+<text x="425.0" y="58" text-anchor="middle">翻多份 Excel</text>
+<rect class="box warn2" x="340" y="84" width="170" height="40" rx="8"/>
+<text x="425.0" y="108" text-anchor="middle">问采购要成本</text>
+<rect class="box warn2" x="340" y="134" width="170" height="40" rx="8"/>
+<text x="425.0" y="158" text-anchor="middle">问产品经理确认适配</text>
+<path class="arrow" d="M290,100 L340,54" marker-end="url(#p2-arr)"/>
+<path class="arrow" d="M290,105 L340,104" marker-end="url(#p2-arr)"/>
+<path class="arrow" d="M290,110 L340,154" marker-end="url(#p2-arr)"/>
+<rect class="box bad2" x="560" y="80" width="150" height="50" rx="8"/>
+<text x="635.0" y="102" text-anchor="middle">回复客户</text>
+<text x="635.0" y="118" text-anchor="middle" class="small">数小时到数天</text>
+<path class="arrow" d="M510,54 L560,100" marker-end="url(#p2-arr)"/>
+<path class="arrow" d="M510,104 L560,105" marker-end="url(#p2-arr)"/>
+<path class="arrow" d="M510,154 L560,110" marker-end="url(#p2-arr)"/>
+<text x="760" y="100" text-anchor="middle" class="small">信息散在人脑和个人电脑</text>
+<text x="760" y="116" text-anchor="middle" class="small">查完不沉淀，下次再查一遍</text>
+<rect class="lane" x="10" y="200" width="880" height="170" rx="10"/>
+<text x="22" y="218" class="lane-label">有了系统：一个搜索框</text>
+<rect class="box ext" x="30" y="260" width="110" height="50" rx="8"/>
+<text x="85.0" y="282" text-anchor="middle">客户</text>
+<text x="85.0" y="298" text-anchor="middle" class="small">发来一个号 / 一张图</text>
+<rect class="box soft" x="180" y="260" width="140" height="50" rx="8"/>
+<text x="250.0" y="282" text-anchor="middle">一个搜索框</text>
+<text x="250.0" y="298" text-anchor="middle" class="small">编号 / 名称 / 照片</text>
+<path class="arrow" d="M140,285 L180,285" marker-end="url(#p2-arr)"/>
+<rect class="box soft" x="370" y="260" width="190" height="50" rx="8"/>
+<text x="465.0" y="282" text-anchor="middle">产品数据库</text>
+<text x="465.0" y="298" text-anchor="middle" class="small">归一化 · 三级匹配 · 视觉识别</text>
+<path class="arrow" d="M320,285 L370,285" marker-end="url(#p2-arr)"/>
+<text x="345.0" y="279.0" text-anchor="middle" class="small">自动识别输入类型</text>
+<rect class="box good" x="610" y="260" width="170" height="50" rx="8"/>
+<text x="695.0" y="282" text-anchor="middle">产品 + 替代件 + 成本 + 售价</text>
+<text x="695.0" y="298" text-anchor="middle" class="small">≤ 5 秒</text>
+<path class="arrow" d="M560,285 L610,285" marker-end="url(#p2-arr)"/>
+<rect class="box good" x="820" y="260" width="60" height="50" rx="8"/>
+<text x="850.0" y="290" text-anchor="middle">回复</text>
+<path class="arrow" d="M780,285 L820,285" marker-end="url(#p2-arr)"/>
+<path class="arrow" d="M455,310 L455,345 L250,345 L250,310" marker-end="url(#p2-arr)" stroke-dasharray="5 4"/>
+<text x="352" y="340" text-anchor="middle" class="small">每次查询自动留痕，未命中进补数榜</text>
+</svg>
+<figcaption>图 P2 · 一条询盘的处理路径：今天要经过三个人和多份表；有了系统后是一个搜索框直达数据库，并且每次查询都沉淀下来。</figcaption>
+</figure>
+<!-- /fig:p2 -->
 <h3>1.3 MVP 目标</h3>
 <p>MVP 不是上线系统，而是一次向总经理的演示。它要证明三件事：</p>
 <ol>
@@ -58,6 +114,122 @@
 <h3>1.4 一句话定义</h3>
 <div class="note">一个以标准化产品数据为核心的内部系统：把供应商的乱格式资料导入成标准字段，持续度量数据完整度，让销售用一个搜索框（文字或图片）秒级得到产品、替代件、供应商成本与建议报价，并用 AI 生成平台上架文案。</div>
 
+<!-- fig:p3a -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 380" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="产品数据从供应商资料到已审核状态的流转">
+<defs><marker id="p3a-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="p3a-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="50" width="150" height="40" rx="8"/>
+<text x="95.0" y="74" text-anchor="middle">供应商 Excel / CSV</text>
+<path class="arrow" d="M170,70 L230,140" marker-end="url(#p3a-arr)"/>
+<rect class="box ext" x="20" y="100" width="150" height="40" rx="8"/>
+<text x="95.0" y="124" text-anchor="middle">供应商 PDF 目录</text>
+<path class="arrow" d="M170,120 L230,140" marker-end="url(#p3a-arr)"/>
+<rect class="box ext" x="20" y="150" width="150" height="40" rx="8"/>
+<text x="95.0" y="174" text-anchor="middle">供应商图片</text>
+<path class="arrow" d="M170,170 L230,140" marker-end="url(#p3a-arr)"/>
+<rect class="box ext" x="20" y="200" width="150" height="40" rx="8"/>
+<text x="95.0" y="224" text-anchor="middle">公司现有 Excel</text>
+<path class="arrow" d="M170,220 L230,140" marker-end="url(#p3a-arr)"/>
+<rect class="box soft" x="230" y="95" width="170" height="90" rx="8"/>
+<text x="315.0" y="130" text-anchor="middle" font-weight="600">F1 导入向导</text>
+<text x="315.0" y="146" text-anchor="middle" class="small">表头定位 · 列映射</text>
+<text x="315.0" y="160" text-anchor="middle" class="small">预检 · 事务导入</text>
+<rect class="box " x="460" y="110" width="150" height="60" rx="8"/>
+<text x="535.0" y="138" text-anchor="middle">Part · draft</text>
+<text x="535.0" y="152" text-anchor="middle" class="small">source=import</text>
+<path class="arrow" d="M400,140 L460,140" marker-end="url(#p3a-arr)"/>
+<text x="430.0" y="134.0" text-anchor="middle" class="small">事务写入</text>
+<rect class="box " x="230" y="300" width="170" height="50" rx="8"/>
+<text x="315.0" y="322" text-anchor="middle">SupplierOffer</text>
+<text x="315.0" y="338" text-anchor="middle" class="small">成本 · MOQ · 交期</text>
+<path class="arrow" d="M300,185 L300,300" marker-end="url(#p3a-arr)"/>
+<text x="308" y="245" text-anchor="start" class="small">报价单同样走导入</text>
+<rect class="box soft" x="460" y="220" width="150" height="60" rx="8"/>
+<text x="535.0" y="248" text-anchor="middle">F5 AI 补全</text>
+<text x="535.0" y="262" text-anchor="middle" class="small">生成 AISuggestion</text>
+<path class="arrow" d="M535,170 L535,220" marker-end="url(#p3a-arr)"/>
+<text x="543" y="200" text-anchor="start" class="small">缺什么补什么</text>
+<rect class="box soft" x="670" y="220" width="150" height="60" rx="8"/>
+<text x="745.0" y="248" text-anchor="middle">审核台</text>
+<text x="745.0" y="262" text-anchor="middle" class="small">字段级采纳 / 拒绝 · 留痕</text>
+<path class="arrow" d="M610,250 L670,250" marker-end="url(#p3a-arr)"/>
+<text x="640" y="268" text-anchor="middle" class="small">pending</text>
+<rect class="box good" x="670" y="110" width="150" height="60" rx="8"/>
+<text x="745.0" y="138" text-anchor="middle">Part · reviewed</text>
+<text x="745.0" y="152" text-anchor="middle" class="small">AI 字段 source=ai 可追溯</text>
+<path class="arrow" d="M745,220 L745,170" marker-end="url(#p3a-arr)"/>
+<text x="753" y="200" text-anchor="start" class="small">采纳写回</text>
+<path class="arrow" d="M610,140 L670,140" marker-end="url(#p3a-arr)" stroke-dasharray="5 4"/>
+<text x="640" y="126" text-anchor="middle" class="small">人工审核</text>
+<rect class="box " x="860" y="110" width="90" height="60" rx="8"/>
+<text x="905.0" y="130" text-anchor="middle">F8 导出</text>
+<text x="905.0" y="146" text-anchor="middle" class="small">Alibaba</text>
+<text x="905.0" y="160" text-anchor="middle" class="small">Shopify</text>
+<path class="arrow" d="M820,140 L860,140" marker-end="url(#p3a-arr)"/>
+<rect class="box " x="460" y="300" width="150" height="50" rx="8"/>
+<text x="535.0" y="322" text-anchor="middle">F2 质量看板</text>
+<text x="535.0" y="338" text-anchor="middle" class="small">完整度 · 缺失 · 疑似重复</text>
+<path class="arrow" d="M460,160 L440,160 L440,325 L460,325" marker-end="url(#p3a-arr)" stroke-dasharray="5 4"/>
+<text x="432" y="250" text-anchor="end" class="small">评分</text>
+<path class="arrow" d="M680,165 L645,165 L645,325 L610,325" marker-end="url(#p3a-arr)" stroke-dasharray="5 4"/>
+<text x="653" y="300" text-anchor="start" class="small">评分</text>
+</svg>
+<figcaption>图 P3a · 数据怎么进来、怎么变干净：所有来源经导入向导成为 draft，AI 只产生待审核建议，人采纳后才成为 reviewed；看板全程度量。</figcaption>
+</figure>
+<!-- /fig:p3a -->
+<!-- fig:p3b -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="客户询价从输入到报价单与留痕的流转">
+<defs><marker id="p3b-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="p3b-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="100" width="150" height="70" rx="8"/>
+<text x="95.0" y="126" text-anchor="middle">客户输入</text>
+<text x="95.0" y="140" text-anchor="middle" class="small">编号 / 名称</text>
+<text x="95.0" y="154" text-anchor="middle" class="small">照片</text>
+<rect class="box soft" x="230" y="100" width="170" height="70" rx="8"/>
+<text x="315.0" y="132" text-anchor="middle">归一化 · 三级匹配</text>
+<text x="315.0" y="148" text-anchor="middle" class="small">F3 智能查询</text>
+<path class="arrow" d="M170,125 L230,125" marker-end="url(#p3b-arr)"/>
+<text x="200" y="118" text-anchor="middle" class="small">编号 / 名称</text>
+<rect class="box soft" x="230" y="210" width="170" height="60" rx="8"/>
+<text x="315.0" y="238" text-anchor="middle">视觉识别</text>
+<text x="315.0" y="252" text-anchor="middle" class="small">F4 · 零件类型 · 可见编号</text>
+<path class="arrow" d="M170,150 L230,240" marker-end="url(#p3b-arr)"/>
+<text x="190" y="205" text-anchor="middle" class="small">照片</text>
+<path class="arrow" d="M315,210 L315,170" marker-end="url(#p3b-arr)"/>
+<text x="323" y="195" text-anchor="start" class="small">识别出的编号再查库</text>
+<rect class="box ext" x="460" y="20" width="170" height="60" rx="8"/>
+<text x="545.0" y="48" text-anchor="middle">产品数据库</text>
+<text x="545.0" y="62" text-anchor="middle" class="small">Part · PartNumber · Fitment</text>
+<path class="arrow" d="M400,120 L460,60" marker-end="url(#p3b-arr)" stroke-dasharray="5 4"/>
+<text x="472" y="98" text-anchor="start" class="small">只查库，不让 AI 猜号</text>
+<rect class="box good" x="460" y="100" width="170" height="70" rx="8"/>
+<text x="545.0" y="132" text-anchor="middle">候选 + 替代件</text>
+<text x="545.0" y="148" text-anchor="middle" class="small">匹配类型 · 分数 · 完整度</text>
+<path class="arrow" d="M400,135 L460,135" marker-end="url(#p3b-arr)"/>
+<rect class="box ext" x="690" y="30" width="150" height="50" rx="8"/>
+<text x="765.0" y="52" text-anchor="middle">SupplierOffer</text>
+<text x="765.0" y="68" text-anchor="middle" class="small">三家成本</text>
+<rect class="box soft" x="690" y="100" width="150" height="70" rx="8"/>
+<text x="765.0" y="132" text-anchor="middle">F6 报价单</text>
+<text x="765.0" y="148" text-anchor="middle" class="small">最低成本 × (1 + 毛利)</text>
+<path class="arrow" d="M630,135 L690,135" marker-end="url(#p3b-arr)"/>
+<text x="660.0" y="129.0" text-anchor="middle" class="small">确认后</text>
+<path class="arrow" d="M765,80 L765,100" marker-end="url(#p3b-arr)"/>
+<text x="773" y="95" text-anchor="start" class="small">best_offer</text>
+<rect class="box good" x="880" y="110" width="60" height="50" rx="8"/>
+<text x="910.0" y="140" text-anchor="middle">xlsx</text>
+<path class="arrow" d="M840,135 L880,135" marker-end="url(#p3b-arr)"/>
+<rect class="box " x="690" y="210" width="150" height="60" rx="8"/>
+<text x="765.0" y="238" text-anchor="middle">F7 询价留痕</text>
+<text x="765.0" y="252" text-anchor="middle" class="small">输入 · 命中 · 时间 · 人</text>
+<path class="arrow" d="M545,170 L545,240 L690,240" marker-end="url(#p3b-arr)"/>
+<text x="555" y="232" text-anchor="start" class="small">每次查询自动留痕</text>
+<path class="arrow" d="M765,270 L765,295 L95,295 L95,170" marker-end="url(#p3b-arr)" stroke-dasharray="5 4"/>
+<text x="430" y="310" text-anchor="middle" class="small">未命中榜 → 下一步补哪些数据</text>
+</svg>
+<figcaption>图 P3b · 数据怎么被使用：文字和照片两种输入都落到同一套匹配上，匹配只查自家数据库；结果直接生成报价单，查询本身又反哺数据补齐。</figcaption>
+</figure>
+<!-- /fig:p3b -->
 <h2 id="s2">2. 岗位职责与系统功能对照</h2>
 <p>岗位描述里的五块职责，逐条对应到系统里的页面与 AI 介入点。</p>
 <div class="tbl"><table>
@@ -77,7 +249,111 @@
 <div class="card"><h3>总经理（演示对象）</h3><p><b>关心：</b>响应速度、数据资产是否沉淀、AI 是否靠谱、成本多少、多久能用。<b>不关心：</b>技术栈细节。</p></div>
 </div>
 
+<!-- fig:p4 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="四类用户角色与功能、共享数据的关系">
+<defs><marker id="p4-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="p4-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="lane" x="20" y="14" width="200" height="218" rx="10"/>
+<text x="32" y="32" class="lane-label">销售</text>
+<rect class="box soft" x="32" y="46" width="176" height="34" rx="8"/>
+<text x="120.0" y="68" text-anchor="middle">F3 智能查询</text>
+<rect class="box soft" x="32" y="90" width="176" height="34" rx="8"/>
+<text x="120.0" y="112" text-anchor="middle">F4 图片询价</text>
+<rect class="box soft" x="32" y="134" width="176" height="34" rx="8"/>
+<text x="120.0" y="156" text-anchor="middle">F6 一键报价单</text>
+<rect class="box soft" x="32" y="178" width="176" height="34" rx="8"/>
+<text x="120.0" y="200" text-anchor="middle">F7 询价留痕</text>
+<path class="arrow" d="M120,232 L120,268" marker-end="url(#p4-arr)"/>
+<text x="126" y="254" text-anchor="start" class="small">读产品与成本</text>
+<rect class="lane" x="240" y="14" width="200" height="218" rx="10"/>
+<text x="252" y="32" class="lane-label">采购</text>
+<rect class="box soft" x="252" y="46" width="176" height="34" rx="8"/>
+<text x="340.0" y="68" text-anchor="middle">F1 导入供应商报价单</text>
+<rect class="box soft" x="252" y="90" width="176" height="34" rx="8"/>
+<text x="340.0" y="112" text-anchor="middle">F6 供应商比价</text>
+<rect class="box soft" x="252" y="134" width="176" height="34" rx="8"/>
+<text x="340.0" y="156" text-anchor="middle">F0 供应商信息维护</text>
+<path class="arrow" d="M340,232 L340,268" marker-end="url(#p4-arr)"/>
+<text x="346" y="254" text-anchor="start" class="small">写供应商与报价</text>
+<rect class="lane" x="460" y="14" width="200" height="218" rx="10"/>
+<text x="472" y="32" class="lane-label">数据运营（本岗位）</text>
+<rect class="box soft" x="472" y="46" width="176" height="34" rx="8"/>
+<text x="560.0" y="68" text-anchor="middle">F1 导入向导 · 数据字典</text>
+<rect class="box soft" x="472" y="90" width="176" height="34" rx="8"/>
+<text x="560.0" y="112" text-anchor="middle">F2 质量看板</text>
+<rect class="box soft" x="472" y="134" width="176" height="34" rx="8"/>
+<text x="560.0" y="156" text-anchor="middle">F5 AI 补全审核台</text>
+<rect class="box soft" x="472" y="178" width="176" height="34" rx="8"/>
+<text x="560.0" y="200" text-anchor="middle">F0 后台维护分类属性</text>
+<path class="arrow" d="M560,232 L560,268" marker-end="url(#p4-arr)"/>
+<text x="566" y="254" text-anchor="start" class="small">写主数据并审核</text>
+<rect class="lane" x="680" y="14" width="200" height="218" rx="10"/>
+<text x="692" y="32" class="lane-label">总经理</text>
+<rect class="box soft" x="692" y="46" width="176" height="34" rx="8"/>
+<text x="780.0" y="68" text-anchor="middle">F2 看板：数据健康度</text>
+<rect class="box soft" x="692" y="90" width="176" height="34" rx="8"/>
+<text x="780.0" y="112" text-anchor="middle">F7 未命中榜：需求沉淀</text>
+<path class="arrow" d="M780,232 L780,268" marker-end="url(#p4-arr)"/>
+<text x="786" y="254" text-anchor="start" class="small">看指标</text>
+<rect class="box ext" x="20" y="268" width="860" height="56" rx="8"/>
+<text x="450.0" y="294" text-anchor="middle" font-weight="600">标准化产品数据</text>
+<text x="450.0" y="308" text-anchor="middle" class="small">Part · PartNumber · Fitment · SupplierOffer · Inquiry · AISuggestion</text>
+</svg>
+<figcaption>图 P4 · 谁用哪些功能：四类角色各自的入口不同，但都读写同一份标准化产品数据，这份数据是系统的中心。</figcaption>
+</figure>
+<!-- /fig:p4 -->
 <h2 id="s4">4. 核心概念词典</h2>
+<!-- fig:p1 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="一个 SKU 与它的 OE 号、互换号、供应商料号、适配车型的关系">
+<defs><marker id="p1-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="p1-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box soft" x="340" y="170" width="220" height="90" rx="8"/>
+<text x="450.0" y="206" text-anchor="middle" font-weight="600">SKU FIT-BRK-00123</text>
+<text x="450.0" y="220" text-anchor="middle" class="small">Brake Pad Set, Front Axle</text>
+<text x="450.0" y="234" text-anchor="middle" class="small">分类 · 规格 · 图片 · 包装</text>
+<rect class="box " x="300" y="30" width="160" height="50" rx="8"/>
+<text x="380.0" y="52" text-anchor="middle">Volvo FH12 / D12</text>
+<text x="380.0" y="68" text-anchor="middle" class="small">1993–2005</text>
+<rect class="box " x="480" y="30" width="160" height="50" rx="8"/>
+<text x="560.0" y="52" text-anchor="middle">Renault Magnum</text>
+<text x="560.0" y="68" text-anchor="middle" class="small">1997–2005</text>
+<path class="arrow" d="M400,170 L380,80" marker-end="url(#p1-arr)"/>
+<path class="arrow" d="M500,170 L560,80" marker-end="url(#p1-arr)"/>
+<text x="450" y="128" text-anchor="middle" class="small">适配车型 Fitment</text>
+<rect class="box " x="40" y="120" width="200" height="50" rx="8"/>
+<text x="140.0" y="150" text-anchor="middle">Volvo OE 20443906</text>
+<rect class="box " x="40" y="200" width="200" height="50" rx="8"/>
+<text x="140.0" y="222" text-anchor="middle">Renault OE 7420443906</text>
+<text x="140.0" y="238" text-anchor="middle" class="small">= 74 + Volvo 号</text>
+<path class="arrow" d="M240,145 L340,200" marker-end="url(#p1-arr)"/>
+<path class="arrow" d="M240,225 L340,225" marker-end="url(#p1-arr)"/>
+<text x="290" y="128" text-anchor="middle" class="small">原厂号 kind=OE</text>
+<rect class="box " x="660" y="120" width="200" height="50" rx="8"/>
+<text x="760.0" y="150" text-anchor="middle">Knorr-Bremse K001234</text>
+<rect class="box " x="660" y="200" width="200" height="50" rx="8"/>
+<text x="760.0" y="222" text-anchor="middle">Meritor MDP5090</text>
+<text x="760.0" y="238" text-anchor="middle" class="small">示意编号</text>
+<path class="arrow" d="M560,200 L660,145" marker-end="url(#p1-arr)"/>
+<path class="arrow" d="M560,225 L660,225" marker-end="url(#p1-arr)"/>
+<text x="598" y="128" text-anchor="middle" class="small">互换号 kind=CROSS</text>
+<rect class="box " x="300" y="340" width="180" height="60" rx="8"/>
+<text x="390.0" y="368" text-anchor="middle">供应商甲 HB-2044</text>
+<text x="390.0" y="382" text-anchor="middle" class="small">USD 18.50 · MOQ 50 · 25 天</text>
+<rect class="box " x="500" y="340" width="180" height="60" rx="8"/>
+<text x="590.0" y="368" text-anchor="middle">供应商乙 BP-0931</text>
+<text x="590.0" y="382" text-anchor="middle" class="small">USD 17.90 · MOQ 100 · 30 天</text>
+<path class="arrow" d="M400,260 L360,340" marker-end="url(#p1-arr)"/>
+<path class="arrow" d="M500,260 L620,340" marker-end="url(#p1-arr)"/>
+<text x="450" y="292" text-anchor="middle" class="small">kind=SUPPLIER</text>
+<rect class="box ext" x="40" y="330" width="200" height="60" rx="8"/>
+<text x="140.0" y="358" text-anchor="middle">客户询价</text>
+<text x="140.0" y="372" text-anchor="middle" class="small">拿着任一编号 / 照片 / 名称</text>
+<path class="arrow hi" d="M240,360 L340,250" marker-end="url(#p1-arrh)"/>
+<text x="300" y="330" text-anchor="start" class="small">要在几秒内对上号</text>
+</svg>
+<figcaption>图 P1 · 同一个零件的多个身份。客户拿着任意一个身份来问，系统都要落到同一个 SKU 上，这就是匹配的核心难点。编号为示意。</figcaption>
+</figure>
+<!-- /fig:p1 -->
 <div class="tbl"><table>
 <tr><th>术语</th><th>英文</th><th>解释</th><th>示例</th></tr>
 <tr><td>SKU / 料号</td><td>SKU, internal part number</td><td>公司自己的内部编号，系统内唯一。岗位描述中称 "FIT SKU"。</td><td><code>FIT-BRK-00123</code></td></tr>
@@ -183,6 +459,51 @@
 <tr><td>F8 平台导出</td><td>产品列表多选 → 导出</td><td>SKU 集合、平台</td><td>CSV</td><td>只导出已审核且有主图的 SKU</td></tr>
 </table></div>
 
+<!-- fig:p5 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 290" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Part 与 AISuggestion 的状态转换">
+<defs><marker id="p5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="p5-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<text x="20" y="30" text-anchor="start" class="lane-label">Part.status</text>
+<circle cx="30" cy="68" r="5" style="fill:var(--muted)"/>
+<rect class="box " x="60" y="40" width="180" height="56" rx="8"/>
+<text x="150.0" y="66" text-anchor="middle">draft</text>
+<text x="150.0" y="80" text-anchor="middle" class="small">导入 / AI / 手工新建后的初始态</text>
+<path class="arrow" d="M35,68 L60,68" marker-end="url(#p5-arr)"/>
+<rect class="box good" x="330" y="40" width="180" height="56" rx="8"/>
+<text x="420.0" y="66" text-anchor="middle">reviewed</text>
+<text x="420.0" y="80" text-anchor="middle" class="small">关键字段经人确认</text>
+<path class="arrow" d="M240,68 L330,68" marker-end="url(#p5-arr)"/>
+<text x="285.0" y="62.0" text-anchor="middle" class="small">人工审核</text>
+<rect class="box good" x="600" y="40" width="180" height="56" rx="8"/>
+<text x="690.0" y="66" text-anchor="middle">published</text>
+<text x="690.0" y="80" text-anchor="middle" class="small">已导出上架</text>
+<path class="arrow" d="M510,68 L600,68" marker-end="url(#p5-arr)"/>
+<text x="555.0" y="62.0" text-anchor="middle" class="small">F8 导出后标记</text>
+<path class="arrow" d="M690,96 L690,118 L420,118 L420,96" marker-end="url(#p5-arr)" stroke-dasharray="5 4"/>
+<text x="555" y="132" text-anchor="middle" class="small">关键字段变更需复审</text>
+<text x="20" y="170" text-anchor="start" class="lane-label">AISuggestion.status</text>
+<circle cx="30" cy="208" r="5" style="fill:var(--muted)"/>
+<rect class="box warn2" x="60" y="180" width="180" height="56" rx="8"/>
+<text x="150.0" y="206" text-anchor="middle">pending</text>
+<text x="150.0" y="220" text-anchor="middle" class="small">AI 生成，等待审核</text>
+<path class="arrow" d="M35,208 L60,208" marker-end="url(#p5-arr)"/>
+<rect class="box good" x="330" y="160" width="180" height="44" rx="8"/>
+<text x="420.0" y="180" text-anchor="middle">accepted</text>
+<text x="420.0" y="194" text-anchor="middle" class="small">采纳的字段写回 Part</text>
+<rect class="box bad2" x="330" y="222" width="180" height="44" rx="8"/>
+<text x="420.0" y="242" text-anchor="middle">rejected</text>
+<text x="420.0" y="256" text-anchor="middle" class="small">记录原因，用于改提示词</text>
+<path class="arrow" d="M240,200 L330,182" marker-end="url(#p5-arr)"/>
+<text x="280" y="180" text-anchor="middle" class="small">采纳</text>
+<path class="arrow" d="M240,216 L330,244" marker-end="url(#p5-arr)"/>
+<text x="280" y="246" text-anchor="middle" class="small">拒绝</text>
+<path class="arrow hi" d="M420,160 L420,138 L150,138 L150,96" marker-end="url(#p5-arrh)"/>
+<text x="275" y="152" text-anchor="middle" class="small">accept()：逐字段写回 · source=ai · 状态不变</text>
+<text x="560" y="200" text-anchor="start" class="small">唯一一条 AI 内容进入业务字段的路径</text>
+</svg>
+<figcaption>图 P5 · 两个状态机。Part 从 draft 到 reviewed 必须经人；AISuggestion 只有 accepted 一条路能写回 Part，且不改变 Part 的状态。</figcaption>
+</figure>
+<!-- /fig:p5 -->
 <h2 id="s7">7. 非功能需求</h2>
 <div class="tbl"><table>
 <tr><th>类别</th><th>要求</th></tr>

@@ -82,6 +82,57 @@
 <li><b>数据层</b>：Django 模型、自定义 QuerySet 与 Manager。查询逻辑放在 QuerySet 上，让服务层和 Admin 都能复用。</li>
 </ul>
 
+<!-- fig:a2 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 270" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="一次 HTMX 搜索请求从浏览器到数据库再返回的路径">
+<defs><marker id="a2-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a2-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="70" width="130" height="80" rx="8"/>
+<text x="85.0" y="100" text-anchor="middle">浏览器</text>
+<text x="85.0" y="116" text-anchor="middle" class="small">输入框 hx-get</text>
+<text x="85.0" y="130" text-anchor="middle" class="small">防抖 300 ms</text>
+<rect class="box soft" x="190" y="70" width="170" height="80" rx="8"/>
+<text x="275.0" y="100" text-anchor="middle">SearchView</text>
+<text x="275.0" y="116" text-anchor="middle" class="small">GET /search/?q=</text>
+<text x="275.0" y="130" text-anchor="middle" class="small">request.htmx 判断整页或局部</text>
+<rect class="box soft" x="400" y="70" width="190" height="80" rx="8"/>
+<text x="495.0" y="100" text-anchor="middle">matcher.search()</text>
+<text x="495.0" y="116" text-anchor="middle" class="small">normalize → L1 → L2 → L3</text>
+<text x="495.0" y="130" text-anchor="middle" class="small">返回 list[Candidate]</text>
+<rect class="box " x="630" y="70" width="160" height="80" rx="8"/>
+<text x="710.0" y="100" text-anchor="middle">PartQuerySet</text>
+<text x="710.0" y="116" text-anchor="middle" class="small">with_related()</text>
+<text x="710.0" y="130" text-anchor="middle" class="small">with_min_cost()</text>
+<rect class="box ext" x="830" y="70" width="110" height="80" rx="8"/>
+<text x="885.0" y="100" text-anchor="middle">PostgreSQL</text>
+<text x="885.0" y="116" text-anchor="middle" class="small">B-tree</text>
+<text x="885.0" y="130" text-anchor="middle" class="small">GIN trigram</text>
+<path class="arrow" d="M150,95 L190,95" marker-end="url(#a2-arr)"/>
+<text x="170" y="88" text-anchor="middle" class="small">q</text>
+<path class="arrow" d="M360,95 L400,95" marker-end="url(#a2-arr)"/>
+<text x="380" y="88" text-anchor="middle" class="small">q</text>
+<path class="arrow" d="M590,95 L630,95" marker-end="url(#a2-arr)"/>
+<text x="610" y="88" text-anchor="middle" class="small">ids</text>
+<path class="arrow" d="M790,95 L830,95" marker-end="url(#a2-arr)"/>
+<text x="810" y="62" text-anchor="middle" class="small">≤ 8 条 SQL</text>
+<path class="arrow" d="M830,125 L790,125" marker-end="url(#a2-arr)" stroke-dasharray="5 4"/>
+<path class="arrow" d="M630,125 L590,125" marker-end="url(#a2-arr)" stroke-dasharray="5 4"/>
+<text x="610" y="166" text-anchor="middle" class="small">Part + 预取</text>
+<path class="arrow" d="M400,125 L360,125" marker-end="url(#a2-arr)" stroke-dasharray="5 4"/>
+<text x="380" y="166" text-anchor="middle" class="small">Candidate[]</text>
+<path class="arrow" d="M190,125 L150,125" marker-end="url(#a2-arr)" stroke-dasharray="5 4"/>
+<text x="170" y="166" text-anchor="middle" class="small">局部 HTML</text>
+<text x="80" y="186" text-anchor="middle" class="small">hx-swap 只替换结果区</text>
+<rect class="box " x="190" y="200" width="170" height="50" rx="8"/>
+<text x="275.0" y="222" text-anchor="middle">Inquiry.objects.create</text>
+<text x="275.0" y="238" text-anchor="middle" class="small">F7 留痕，一条 INSERT</text>
+<path class="arrow" d="M275,150 L275,200" marker-end="url(#a2-arr)"/>
+<text x="283" y="180" text-anchor="start" class="small">每次非空查询</text>
+<text x="520" y="235" text-anchor="start" class="small">视图只做三件事：取参数、调服务、渲染模板。</text>
+<text x="520" y="253" text-anchor="start" class="small">匹配逻辑全部在 services，后台任务与测试可直接调用。</text>
+</svg>
+<figcaption>图 A2 · 一次搜索请求穿过的层。实线是请求方向，虚线是返回；视图很薄，匹配全在服务层。</figcaption>
+</figure>
+<!-- /fig:a2 -->
 <h2 id="s3">3. 技术选型与取舍</h2>
 <div class="tbl"><table>
 <tr><th>决策点</th><th>选择</th><th>备选</th><th>为什么这样选</th><th>放弃了什么</th></tr>
@@ -157,6 +208,57 @@
 <li><b>不在 views 里写业务</b>：视图负责取参数、调服务、渲染模板；任何超过 10 行的逻辑进 services 或 QuerySet。</li>
 </ul>
 
+<!-- fig:a1 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="各 Django app 的依赖方向">
+<defs><marker id="a1-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a1-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box " x="60" y="30" width="160" height="50" rx="8"/>
+<text x="140.0" y="52" text-anchor="middle" font-weight="600">importer</text>
+<text x="140.0" y="68" text-anchor="middle" class="small">导入向导</text>
+<rect class="box " x="300" y="30" width="160" height="50" rx="8"/>
+<text x="380.0" y="52" text-anchor="middle" font-weight="600">inquiries</text>
+<text x="380.0" y="68" text-anchor="middle" class="small">查询 · 图片 · 报价 · 导出</text>
+<rect class="box ext" x="660" y="30" width="160" height="50" rx="8"/>
+<text x="740.0" y="52" text-anchor="middle" font-weight="600">users</text>
+<text x="740.0" y="68" text-anchor="middle" class="small">自定义 User</text>
+<rect class="box " x="60" y="130" width="160" height="50" rx="8"/>
+<text x="140.0" y="152" text-anchor="middle" font-weight="600">ai</text>
+<text x="140.0" y="168" text-anchor="middle" class="small">LLM 封装 · 建议 · 审计</text>
+<rect class="box " x="540" y="130" width="160" height="50" rx="8"/>
+<text x="620.0" y="152" text-anchor="middle" font-weight="600">suppliers</text>
+<text x="620.0" y="168" text-anchor="middle" class="small">Supplier · Offer · quoting</text>
+<rect class="box soft" x="300" y="230" width="160" height="50" rx="8"/>
+<text x="380.0" y="252" text-anchor="middle" font-weight="600">catalog</text>
+<text x="380.0" y="268" text-anchor="middle" class="small">Part · 编号 · 匹配 · 评分</text>
+<rect class="box ext" x="300" y="330" width="160" height="50" rx="8"/>
+<text x="380.0" y="352" text-anchor="middle" font-weight="600">core</text>
+<text x="380.0" y="368" text-anchor="middle" class="small">TimeStampedModel · SourcedModel</text>
+<path class="arrow" d="M140,80 L140,130" marker-end="url(#a1-arr)"/>
+<text x="148" y="110" text-anchor="start" class="small">列映射用 LLM</text>
+<path class="arrow" d="M200,80 L330,230" marker-end="url(#a1-arr)"/>
+<text x="262" y="140" text-anchor="start" class="small">写 Part / PartNumber</text>
+<path class="arrow" d="M220,60 L540,148" marker-end="url(#a1-arr)"/>
+<text x="400" y="98" text-anchor="middle" class="small">写报价</text>
+<path class="arrow" d="M300,60 L220,140" marker-end="url(#a1-arr)"/>
+<text x="250" y="96" text-anchor="middle" class="small">视觉识别</text>
+<path class="arrow" d="M380,80 L380,230" marker-end="url(#a1-arr)"/>
+<text x="388" y="160" text-anchor="start" class="small">matcher</text>
+<path class="arrow" d="M460,60 L580,130" marker-end="url(#a1-arr)"/>
+<text x="540" y="90" text-anchor="middle" class="small">best_offer</text>
+<path class="arrow" d="M460,45 L660,45" marker-end="url(#a1-arr)" stroke-dasharray="5 4"/>
+<text x="560" y="38" text-anchor="middle" class="small">created_by（importer、ai 同）</text>
+<path class="arrow" d="M220,165 L300,245" marker-end="url(#a1-arr)"/>
+<text x="228" y="232" text-anchor="end" class="small">补全 Part</text>
+<path class="arrow" d="M540,165 L460,245" marker-end="url(#a1-arr)"/>
+<text x="520" y="225" text-anchor="middle" class="small">Offer → Part</text>
+<path class="arrow" d="M380,280 L380,330" marker-end="url(#a1-arr)"/>
+<text x="388" y="310" text-anchor="start" class="small">所有 app 的模型继承 core 的抽象基类</text>
+<text x="720" y="250" text-anchor="start" class="small">箭头方向 = import 方向</text>
+<text x="720" y="268" text-anchor="start" class="small">只允许向下依赖，禁止反向与循环</text>
+</svg>
+<figcaption>图 A1 · app 之间的依赖方向。catalog 是核心，上层 app 依赖它，它不依赖任何业务 app；这条规则是避免循环导入的全部依据。</figcaption>
+</figure>
+<!-- /fig:a1 -->
 <h2 id="s5">5. Django 5.2 实践清单</h2>
 <div class="tbl"><table>
 <tr><th>实践</th><th>用在哪</th><th>说明</th></tr>
@@ -328,6 +430,59 @@ apps/ai/llm/mock.py            # 从 prompts/&lt;name&gt;.example.json 读固定
 apps/ai/llm/factory.py         # get_client() 按 settings.LLM_PROVIDER 返回实例；测试固定 mock
 apps/ai/prompts/loader.py      # 读取 prompts/&lt;name&gt;.md：front matter（description、model_hint、temperature）+ 模板正文，用 str.format_map 填充
 </code></pre>
+<!-- fig:a7 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="LLM 客户端抽象、实现与提示词加载的结构">
+<defs><marker id="a7-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a7-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box " x="20" y="90" width="200" height="90" rx="8"/>
+<text x="120.0" y="118" text-anchor="middle">调用方</text>
+<text x="120.0" y="134" text-anchor="middle" class="small">importer.services.mapping</text>
+<text x="120.0" y="148" text-anchor="middle" class="small">ai.services.enrich</text>
+<text x="120.0" y="162" text-anchor="middle" class="small">inquiries.services.image_inquiry</text>
+<rect class="box ext" x="280" y="20" width="160" height="50" rx="8"/>
+<text x="360.0" y="42" text-anchor="middle">.env → settings</text>
+<text x="360.0" y="58" text-anchor="middle" class="small">LLM_PROVIDER · BASE_URL · KEY · MODEL</text>
+<rect class="box soft" x="280" y="105" width="160" height="60" rx="8"/>
+<text x="360.0" y="132" text-anchor="middle">llm.factory</text>
+<text x="360.0" y="148" text-anchor="middle" class="small">get_client()</text>
+<path class="arrow" d="M220,135 L280,135" marker-end="url(#a7-arr)"/>
+<text x="250" y="128" text-anchor="middle" class="small">唯一入口</text>
+<path class="arrow" d="M360,70 L360,105" marker-end="url(#a7-arr)"/>
+<rect class="box soft" x="500" y="105" width="180" height="60" rx="8"/>
+<text x="590.0" y="126" text-anchor="middle">LLMClient（Protocol）</text>
+<text x="590.0" y="140" text-anchor="middle" class="small">extract_json · generate_text</text>
+<text x="590.0" y="154" text-anchor="middle" class="small">describe_image</text>
+<path class="arrow" d="M440,135 L500,135" marker-end="url(#a7-arr)"/>
+<text x="470" y="128" text-anchor="middle" class="small">返回实例</text>
+<rect class="box " x="720" y="30" width="160" height="55" rx="8"/>
+<text x="800.0" y="55" text-anchor="middle">OpenAICompatClient</text>
+<text x="800.0" y="70" text-anchor="middle" class="small">openai SDK · base_url</text>
+<rect class="box ext" x="720" y="110" width="160" height="50" rx="8"/>
+<text x="800.0" y="132" text-anchor="middle">DeepSeek / 千问 / Kimi</text>
+<text x="800.0" y="148" text-anchor="middle" class="small">HTTPS</text>
+<rect class="box " x="720" y="200" width="160" height="50" rx="8"/>
+<text x="800.0" y="222" text-anchor="middle">MockClient</text>
+<text x="800.0" y="238" text-anchor="middle" class="small">读 *.example.json · 离线</text>
+<path class="arrow" d="M680,125 L720,60" marker-end="url(#a7-arr)" stroke-dasharray="5 4"/>
+<text x="714" y="110" text-anchor="start" class="small">实现</text>
+<path class="arrow" d="M680,150 L720,222" marker-end="url(#a7-arr)" stroke-dasharray="5 4"/>
+<text x="668" y="195" text-anchor="end" class="small">实现</text>
+<path class="arrow" d="M800,85 L800,110" marker-end="url(#a7-arr)"/>
+<rect class="box " x="500" y="215" width="180" height="60" rx="8"/>
+<text x="590.0" y="236" text-anchor="middle">prompts/loader</text>
+<text x="590.0" y="250" text-anchor="middle" class="small">*.md：front matter + 模板</text>
+<text x="590.0" y="264" text-anchor="middle" class="small">str.format_map 填变量</text>
+<path class="arrow" d="M590,215 L590,165" marker-end="url(#a7-arr)"/>
+<text x="598" y="195" text-anchor="start" class="small">渲染提示词</text>
+<rect class="box ext" x="280" y="215" width="160" height="60" rx="8"/>
+<text x="360.0" y="242" text-anchor="middle">AITask</text>
+<text x="360.0" y="258" text-anchor="middle" class="small">每次调用写一条审计</text>
+<path class="arrow" d="M500,160 L440,235" marker-end="url(#a7-arr)"/>
+<text x="478" y="210" text-anchor="start" class="small">写入</text>
+</svg>
+<figcaption>图 A7 · 大模型封装。业务代码只认识 factory 与 Protocol，换提供商只改 .env；mock 实现让全流程离线可跑。</figcaption>
+</figure>
+<!-- /fig:a7 -->
 <ul>
 <li><b>每次调用产生一条 AITask</b>：prompt_name、model、input_digest（sha256 前 16 位）、input_preview（前 500 字）、output、prompt_tokens、completion_tokens、latency_ms、status（ok / invalid_json / error）、error。</li>
 <li><b>JSON 解析失败</b>：重试一次并在提示中附上错误；再失败则 status=invalid_json，业务侧生成低置信度建议或提示人工处理，绝不抛到页面 500。</li>
@@ -358,6 +513,56 @@ apps/importer/services/loader.py
 </code></pre>
 <p>更新规则：已 <code>verified=True</code> 的编号不被导入覆盖；同一 SKU 的非空字段"以新补空、不以新覆旧"，除非映射时勾选"覆盖"。</p>
 
+<!-- fig:a4 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="导入执行时单行数据的判定流程">
+<defs><marker id="a4-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a4-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box " x="20" y="40" width="120" height="44" rx="8"/>
+<text x="80.0" y="66" text-anchor="middle">读取一行</text>
+<rect class="box dec" x="180" y="40" width="210" height="44" rx="8"/>
+<text x="285.0" y="66" text-anchor="middle">有 sku / OE / 供应商料号？</text>
+<path class="arrow" d="M140,62 L180,62" marker-end="url(#a4-arr)"/>
+<rect class="box bad2" x="180" y="120" width="210" height="44" rx="8"/>
+<text x="285.0" y="146" text-anchor="middle">无效：记录具体原因</text>
+<path class="arrow" d="M285,84 L285,120" marker-end="url(#a4-arr)"/>
+<text x="292" y="106" text-anchor="start" class="small">否</text>
+<rect class="box " x="430" y="40" width="170" height="44" rx="8"/>
+<text x="515.0" y="66" text-anchor="middle">拆分一格多号 · 归一化</text>
+<path class="arrow" d="M390,62 L430,62" marker-end="url(#a4-arr)"/>
+<text x="410" y="55" text-anchor="middle" class="small">是</text>
+<rect class="box dec" x="640" y="40" width="240" height="44" rx="8"/>
+<text x="760.0" y="66" text-anchor="middle">number_norm 已在库中？</text>
+<path class="arrow" d="M600,62 L640,62" marker-end="url(#a4-arr)"/>
+<rect class="box good" x="640" y="120" width="240" height="44" rx="8"/>
+<text x="760.0" y="146" text-anchor="middle">新增 Part(draft) + PartNumber</text>
+<path class="arrow" d="M760,84 L760,120" marker-end="url(#a4-arr)"/>
+<text x="768" y="106" text-anchor="start" class="small">否</text>
+<rect class="box dec" x="640" y="200" width="240" height="44" rx="8"/>
+<text x="760.0" y="226" text-anchor="middle">指向同一个 SKU？</text>
+<path class="arrow" d="M880,62 L892,62 L892,222 L880,222" marker-end="url(#a4-arr)"/>
+<text x="897" y="150" text-anchor="start" class="small">是</text>
+<rect class="box warn2" x="400" y="200" width="200" height="44" rx="8"/>
+<text x="500.0" y="226" text-anchor="middle">标记疑似重复 · 不覆盖</text>
+<path class="arrow" d="M640,222 L600,222" marker-end="url(#a4-arr)"/>
+<text x="620" y="215" text-anchor="middle" class="small">否</text>
+<rect class="box dec" x="640" y="280" width="240" height="44" rx="8"/>
+<text x="760.0" y="306" text-anchor="middle">该字段已 verified？</text>
+<path class="arrow" d="M760,244 L760,280" marker-end="url(#a4-arr)"/>
+<text x="768" y="266" text-anchor="start" class="small">是</text>
+<rect class="box " x="400" y="280" width="200" height="44" rx="8"/>
+<text x="500.0" y="306" text-anchor="middle">保留原值，跳过</text>
+<path class="arrow" d="M640,302 L600,302" marker-end="url(#a4-arr)"/>
+<text x="620" y="295" text-anchor="middle" class="small">是</text>
+<rect class="box good" x="640" y="360" width="240" height="44" rx="8"/>
+<text x="760.0" y="386" text-anchor="middle">更新：以新补空 · source=import</text>
+<path class="arrow" d="M760,324 L760,360" marker-end="url(#a4-arr)"/>
+<text x="768" y="346" text-anchor="start" class="small">否</text>
+<rect class="box ext" x="20" y="420" width="860" height="36" rx="6"/>
+<text x="450.0" y="442" text-anchor="middle">每条路径都写一条 ImportRow(result, message)；批次结束后对受影响的 Part 调用 quality.recompute</text>
+</svg>
+<figcaption>图 A4 · 导入时每一行的判定顺序。黄色是判断，绿色是写入，红色是拒绝；"疑似重复"不阻止导入，只是不覆盖并进看板。</figcaption>
+</figure>
+<!-- /fig:a4 -->
 <h3>7.6 quoting 与 export</h3>
 <pre><code>apps/suppliers/services/quoting.py
   best_offer(part) -> SupplierOffer | None           # 单价最低，同价取交期短
@@ -370,6 +575,37 @@ apps/inquiries/services/export.py
       # 只导出 status=reviewed 且有主图；返回被排除的 (sku, reason) 列表
 </code></pre>
 
+<!-- fig:a9 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="从供应商报价到报价单行的计算流">
+<defs><marker id="a9-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a9-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="20" width="170" height="40" rx="8"/>
+<text x="105.0" y="44" text-anchor="middle">供应商甲 18.50 · MOQ 50</text>
+<rect class="box ext" x="20" y="80" width="170" height="40" rx="8"/>
+<text x="105.0" y="104" text-anchor="middle">供应商乙 17.90 · MOQ 100</text>
+<rect class="box ext" x="20" y="140" width="170" height="40" rx="8"/>
+<text x="105.0" y="164" text-anchor="middle">供应商丙 17.90 · 交期 45 天</text>
+<rect class="box soft" x="260" y="70" width="160" height="60" rx="8"/>
+<text x="340.0" y="98" text-anchor="middle">best_offer(part)</text>
+<text x="340.0" y="112" text-anchor="middle" class="small">单价最低，同价取交期短</text>
+<path class="arrow" d="M190,40 L260,90" marker-end="url(#a9-arr)"/>
+<path class="arrow" d="M190,100 L260,100" marker-end="url(#a9-arr)"/>
+<path class="arrow" d="M190,160 L260,110" marker-end="url(#a9-arr)"/>
+<rect class="box soft" x="470" y="70" width="160" height="60" rx="8"/>
+<text x="550.0" y="98" text-anchor="middle">× (1 + 0.25)</text>
+<text x="550.0" y="112" text-anchor="middle" class="small">Decimal，四舍五入两位</text>
+<path class="arrow" d="M420,100 L470,100" marker-end="url(#a9-arr)"/>
+<text x="445" y="92" text-anchor="middle" class="small">17.90（乙）</text>
+<rect class="box good" x="680" y="70" width="200" height="60" rx="8"/>
+<text x="780.0" y="98" text-anchor="middle">QuoteLine 22.38 USD</text>
+<text x="780.0" y="112" text-anchor="middle" class="small">qty · margin · offer · 备注</text>
+<path class="arrow" d="M630,100 L680,100" marker-end="url(#a9-arr)"/>
+<text x="780" y="155" text-anchor="middle" class="small">qty &lt; MOQ 时在备注提示，不阻止</text>
+<text x="780" y="172" text-anchor="middle" class="small">导出 xlsx 含图片 · 描述 · 规格 · 包装 · 替代件</text>
+</svg>
+<figcaption>图 A9 · 报价怎么算出来：三家报价里选最低成本，乘以目标毛利，得到一条可导出的报价行。</figcaption>
+</figure>
+<!-- /fig:a9 -->
 <h2 id="s8">8. 关键流程</h2>
 <h3>8.1 导入向导</h3>
 <ol>
@@ -379,6 +615,91 @@ apps/inquiries/services/export.py
 <li>点击"导入"，<code>loader.execute</code> 在事务内写入，行数超过 500 时投递到 django-q2 后台执行，页面轮询状态。</li>
 <li>完成后跳转结果页：统计、疑似重复列表、逐行结果链接。</li>
 </ol>
+<!-- fig:a3 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 706" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="导入向导从上传到结果页的调用时序">
+<defs><marker id="a3-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a3-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="band" x="8" y="76" width="944" height="124" rx="6"/>
+<text x="14" y="89" text-anchor="start" class="lane-label">上传与预览</text>
+<rect class="band" x="8" y="206" width="944" height="150" rx="6"/>
+<text x="14" y="219" text-anchor="start" class="lane-label">列映射</text>
+<rect class="band" x="8" y="362" width="944" height="150" rx="6"/>
+<text x="14" y="375" text-anchor="start" class="lane-label">预检</text>
+<rect class="band" x="8" y="518" width="944" height="150" rx="6"/>
+<text x="14" y="531" text-anchor="start" class="lane-label">导入</text>
+<line class="life" x1="90.0" y1="60" x2="90.0" y2="698"/>
+<rect class="box ext" x="30.0" y="14" width="120" height="46" rx="8"/>
+<text x="90.0" y="42" text-anchor="middle" font-weight="600">用户</text>
+<line class="life" x1="246.0" y1="60" x2="246.0" y2="698"/>
+<rect class="box soft" x="171.0" y="14" width="150" height="46" rx="8"/>
+<text x="246.0" y="34" text-anchor="middle" font-weight="600">导入向导视图</text>
+<text x="246.0" y="50" text-anchor="middle" class="small">importer.views</text>
+<line class="life" x1="402.0" y1="60" x2="402.0" y2="698"/>
+<rect class="box " x="327.0" y="14" width="150" height="46" rx="8"/>
+<text x="402.0" y="34" text-anchor="middle" font-weight="600">loader</text>
+<text x="402.0" y="50" text-anchor="middle" class="small">importer.services</text>
+<line class="life" x1="558.0" y1="60" x2="558.0" y2="698"/>
+<rect class="box " x="483.0" y="14" width="150" height="46" rx="8"/>
+<text x="558.0" y="34" text-anchor="middle" font-weight="600">mapping</text>
+<text x="558.0" y="50" text-anchor="middle" class="small">importer.services</text>
+<line class="life" x1="714.0" y1="60" x2="714.0" y2="698"/>
+<rect class="box ext" x="639.0" y="14" width="150" height="46" rx="8"/>
+<text x="714.0" y="34" text-anchor="middle" font-weight="600">LLM</text>
+<text x="714.0" y="50" text-anchor="middle" class="small">mock 或真实</text>
+<line class="life" x1="870.0" y1="60" x2="870.0" y2="698"/>
+<rect class="box ext" x="810.0" y="14" width="120" height="46" rx="8"/>
+<text x="870.0" y="34" text-anchor="middle" font-weight="600">数据库</text>
+<text x="870.0" y="50" text-anchor="middle" class="small">PostgreSQL</text>
+<path class="arrow" d="M90.0,92 L246.0,92" marker-end="url(#a3-arr)"/>
+<text x="168.0" y="87" text-anchor="middle" class="small">① 上传 Excel，选择供应商</text>
+<path class="arrow" d="M246.0,118 L402.0,118" marker-end="url(#a3-arr)"/>
+<text x="324.0" y="113" text-anchor="middle" class="small">read_table(file)</text>
+<path class="arrow" d="M402.0,140 L442.0,140 L442.0,152 L406.0,152" marker-end="url(#a3-arr)"/>
+<text x="450.0" y="150" text-anchor="start" class="small">定位表头 · 全列转字符串 · 去空行</text>
+<path class="arrow" d="M402.0,170 L246.0,170" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="324.0" y="165" text-anchor="middle" class="small">DataFrame 预览</text>
+<path class="arrow" d="M246.0,196 L90.0,196" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="168.0" y="191" text-anchor="middle" class="small">前 20 行 + 表头列表</text>
+<path class="arrow" d="M246.0,222 L558.0,222" marker-end="url(#a3-arr)"/>
+<text x="402.0" y="217" text-anchor="middle" class="small">② suggest_mapping(headers, samples)</text>
+<path class="arrow" d="M558.0,244 L598.0,244 L598.0,256 L562.0,256" marker-end="url(#a3-arr)"/>
+<text x="606.0" y="254" text-anchor="start" class="small">同义词表命中 → confidence 1.0</text>
+<path class="arrow" d="M558.0,274 L714.0,274" marker-end="url(#a3-arr)"/>
+<text x="636.0" y="269" text-anchor="middle" class="small">只送未命中的表头 + 3 行样例</text>
+<path class="arrow" d="M714.0,300 L558.0,300" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="636.0" y="295" text-anchor="middle" class="small">JSON 映射 + 置信度</text>
+<path class="arrow" d="M558.0,326 L246.0,326" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="402.0" y="321" text-anchor="middle" class="small">建议映射（含来源）</text>
+<path class="arrow" d="M246.0,352 L90.0,352" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="168.0" y="347" text-anchor="middle" class="small">映射表，可逐列修改</text>
+<path class="arrow" d="M90.0,378 L246.0,378" marker-end="url(#a3-arr)"/>
+<text x="168.0" y="373" text-anchor="middle" class="small">③ 确认映射，点预检</text>
+<path class="arrow" d="M246.0,404 L402.0,404" marker-end="url(#a3-arr)"/>
+<text x="324.0" y="399" text-anchor="middle" class="small">dry_run(batch)</text>
+<path class="arrow" d="M402.0,430 L870.0,430" marker-end="url(#a3-arr)"/>
+<text x="636.0" y="425" text-anchor="middle" class="small">按 number_norm 查已有编号</text>
+<path class="arrow" d="M870.0,456 L402.0,456" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="636.0" y="451" text-anchor="middle" class="small">已有 / 已验证 / 冲突</text>
+<path class="arrow" d="M402.0,482 L246.0,482" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="324.0" y="477" text-anchor="middle" class="small">新增 / 更新 / 跳过 / 无效 + 原因</text>
+<path class="arrow" d="M246.0,508 L90.0,508" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="168.0" y="503" text-anchor="middle" class="small">预检报告（HTMX 局部）</text>
+<path class="arrow" d="M90.0,534 L246.0,534" marker-end="url(#a3-arr)"/>
+<text x="168.0" y="529" text-anchor="middle" class="small">④ 点导入</text>
+<path class="arrow" d="M246.0,560 L402.0,560" marker-end="url(#a3-arr)"/>
+<text x="324.0" y="555" text-anchor="middle" class="small">execute(batch)  transaction.atomic</text>
+<path class="arrow" d="M402.0,586 L870.0,586" marker-end="url(#a3-arr)"/>
+<text x="636.0" y="581" text-anchor="middle" class="small">写 Part · PartNumber · SupplierOffer · ImportRow</text>
+<path class="arrow" d="M402.0,608 L442.0,608 L442.0,620 L406.0,620" marker-end="url(#a3-arr)"/>
+<text x="450.0" y="618" text-anchor="start" class="small">quality.recompute(受影响的 Part)</text>
+<path class="arrow" d="M402.0,638 L246.0,638" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="324.0" y="633" text-anchor="middle" class="small">ImportReport</text>
+<path class="arrow" d="M246.0,664 L90.0,664" marker-end="url(#a3-arr)" stroke-dasharray="5 4"/>
+<text x="168.0" y="659" text-anchor="middle" class="small">结果页：统计 · 疑似重复 · 逐行结果</text>
+</svg>
+<figcaption>图 A3 · 导入向导的四步时序。同义词表先于 AI；预检不写库；导入在一个事务里，任一行异常整批回滚。</figcaption>
+</figure>
+<!-- /fig:a3 -->
 <h3>8.2 图片询价</h3>
 <ol>
 <li>上传图片，Pillow 校验并压缩到长边 1280、JPEG 质量 85，保存到 <code>media/inquiries/</code>，创建 <code>Inquiry(input_type=image)</code>。</li>
@@ -386,6 +707,68 @@ apps/inquiries/services/export.py
 <li>对每个 <code>visible_numbers</code> 调用 <code>matcher.search</code>；若无编号，用 <code>part_type + brand_hints</code> 走名称检索。合并去重后展示候选与识别结果。</li>
 <li>用户点选候选，写入 <code>Inquiry.matched_part</code>，可继续生成报价单。</li>
 </ol>
+<!-- fig:a5 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 524" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="图片询价从上传到确认候选的调用时序">
+<defs><marker id="a5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a5-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<line class="life" x1="90.0" y1="60" x2="90.0" y2="516"/>
+<rect class="box ext" x="30.0" y="14" width="120" height="46" rx="8"/>
+<text x="90.0" y="42" text-anchor="middle" font-weight="600">用户</text>
+<line class="life" x1="246.0" y1="60" x2="246.0" y2="516"/>
+<rect class="box soft" x="171.0" y="14" width="150" height="46" rx="8"/>
+<text x="246.0" y="34" text-anchor="middle" font-weight="600">ImageInquiryView</text>
+<text x="246.0" y="50" text-anchor="middle" class="small">inquiries.views</text>
+<line class="life" x1="402.0" y1="60" x2="402.0" y2="516"/>
+<rect class="box " x="327.0" y="14" width="150" height="46" rx="8"/>
+<text x="402.0" y="34" text-anchor="middle" font-weight="600">image_inquiry</text>
+<text x="402.0" y="50" text-anchor="middle" class="small">inquiries.services</text>
+<line class="life" x1="558.0" y1="60" x2="558.0" y2="516"/>
+<rect class="box ext" x="483.0" y="14" width="150" height="46" rx="8"/>
+<text x="558.0" y="34" text-anchor="middle" font-weight="600">视觉模型</text>
+<text x="558.0" y="50" text-anchor="middle" class="small">qwen-vl / mock</text>
+<line class="life" x1="714.0" y1="60" x2="714.0" y2="516"/>
+<rect class="box " x="639.0" y="14" width="150" height="46" rx="8"/>
+<text x="714.0" y="34" text-anchor="middle" font-weight="600">matcher</text>
+<text x="714.0" y="50" text-anchor="middle" class="small">catalog.services</text>
+<line class="life" x1="870.0" y1="60" x2="870.0" y2="516"/>
+<rect class="box ext" x="810.0" y="14" width="120" height="46" rx="8"/>
+<text x="870.0" y="42" text-anchor="middle" font-weight="600">数据库</text>
+<path class="arrow" d="M90.0,92 L246.0,92" marker-end="url(#a5-arr)"/>
+<text x="168.0" y="87" text-anchor="middle" class="small">上传照片</text>
+<path class="arrow" d="M246.0,118 L402.0,118" marker-end="url(#a5-arr)"/>
+<text x="324.0" y="113" text-anchor="middle" class="small">prepare_image(file)</text>
+<path class="arrow" d="M402.0,140 L442.0,140 L442.0,152 L406.0,152" marker-end="url(#a5-arr)"/>
+<text x="450.0" y="150" text-anchor="start" class="small">Pillow 校验 · 压缩到长边 1280</text>
+<path class="arrow" d="M402.0,170 L870.0,170" marker-end="url(#a5-arr)"/>
+<text x="636.0" y="165" text-anchor="middle" class="small">创建 Inquiry(input_type=image)</text>
+<path class="arrow" d="M402.0,196 L558.0,196" marker-end="url(#a5-arr)"/>
+<text x="480.0" y="191" text-anchor="middle" class="small">describe_image(prompt=image_identify)</text>
+<path class="arrow" d="M558.0,222 L402.0,222" marker-end="url(#a5-arr)" stroke-dasharray="5 4"/>
+<text x="480.0" y="217" text-anchor="middle" class="small">ImageFinding: 类型 · 可见编号 · 品牌线索</text>
+<path class="arrow" d="M402.0,244 L442.0,244 L442.0,256 L406.0,256" marker-end="url(#a5-arr)"/>
+<text x="450.0" y="254" text-anchor="start" class="small">写 AITask 审计</text>
+<path class="arrow" d="M402.0,274 L714.0,274" marker-end="url(#a5-arr)"/>
+<text x="558.0" y="269" text-anchor="middle" class="small">对每个可见编号 search()</text>
+<path class="arrow" d="M714.0,300 L870.0,300" marker-end="url(#a5-arr)"/>
+<text x="792.0" y="295" text-anchor="middle" class="small">三级匹配查询</text>
+<path class="arrow" d="M870.0,326 L714.0,326" marker-end="url(#a5-arr)" stroke-dasharray="5 4"/>
+<text x="792.0" y="321" text-anchor="middle" class="small">候选</text>
+<path class="arrow" d="M714.0,352 L402.0,352" marker-end="url(#a5-arr)" stroke-dasharray="5 4"/>
+<text x="558.0" y="347" text-anchor="middle" class="small">Candidate[] 合并去重</text>
+<path class="arrow" d="M402.0,378 L714.0,378" marker-end="url(#a5-arr)"/>
+<text x="558.0" y="373" text-anchor="middle" class="small">无编号时：按零件类型 + 品牌线索检索名称</text>
+<path class="arrow" d="M402.0,404 L246.0,404" marker-end="url(#a5-arr)" stroke-dasharray="5 4"/>
+<text x="324.0" y="399" text-anchor="middle" class="small">识别结果 + 候选（全部待确认）</text>
+<path class="arrow" d="M246.0,430 L90.0,430" marker-end="url(#a5-arr)" stroke-dasharray="5 4"/>
+<text x="168.0" y="425" text-anchor="middle" class="small">候选列表页</text>
+<path class="arrow" d="M90.0,456 L246.0,456" marker-end="url(#a5-arr)"/>
+<text x="168.0" y="451" text-anchor="middle" class="small">点选一个候选</text>
+<path class="arrow" d="M246.0,482 L870.0,482" marker-end="url(#a5-arr)"/>
+<text x="558.0" y="477" text-anchor="middle" class="small">Inquiry.matched_part = 选中的 Part</text>
+</svg>
+<figcaption>图 A5 · 图片询价时序。视觉模型只负责读图，编号一律回到自家数据库匹配；确认之前 matched_part 保持为空。</figcaption>
+</figure>
+<!-- /fig:a5 -->
 <h3>8.3 AI 补全与审核</h3>
 <ol>
 <li>产品页点击"AI 补全"，或列表多选后"批量补全"。单个同步执行，批量投递到 <code>ai.tasks.enrich_parts(part_ids)</code>。</li>
@@ -394,6 +777,56 @@ apps/inquiries/services/export.py
 <li>审核台逐条展示"当前值 vs 建议值"，采纳时逐字段写回 Part 并标 <code>source=ai</code>，重算完整度；拒绝时记录原因。</li>
 </ol>
 
+<!-- fig:a6 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="AI 补全从上下文组装到审核写回的数据流">
+<defs><marker id="a6-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a6-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="390" y="16" width="150" height="46" rx="8"/>
+<text x="465.0" y="36" text-anchor="middle">DeepSeek / 千问 / mock</text>
+<text x="465.0" y="52" text-anchor="middle" class="small">OpenAI 兼容接口</text>
+<rect class="box " x="20" y="110" width="140" height="70" rx="8"/>
+<text x="90.0" y="142" text-anchor="middle">Part（有缺失）</text>
+<text x="90.0" y="158" text-anchor="middle" class="small">draft 或 reviewed</text>
+<rect class="box " x="200" y="110" width="150" height="70" rx="8"/>
+<text x="275.0" y="136" text-anchor="middle">build_context()</text>
+<text x="275.0" y="150" text-anchor="middle" class="small">名称 · 编号 · 适配</text>
+<text x="275.0" y="164" text-anchor="middle" class="small">同类已审核样例 2 条</text>
+<path class="arrow" d="M160,145 L200,145" marker-end="url(#a6-arr)"/>
+<rect class="box soft" x="390" y="110" width="150" height="70" rx="8"/>
+<text x="465.0" y="136" text-anchor="middle">get_client()</text>
+<text x="465.0" y="150" text-anchor="middle" class="small">extract_json(enrich_part)</text>
+<text x="465.0" y="164" text-anchor="middle" class="small">JSON mode + pydantic</text>
+<path class="arrow" d="M350,145 L390,145" marker-end="url(#a6-arr)"/>
+<text x="370.0" y="139.0" text-anchor="middle" class="small">变量</text>
+<path class="arrow" d="M465,110 L465,62" marker-end="url(#a6-arr)" stroke-dasharray="5 4"/>
+<text x="472" y="90" text-anchor="start" class="small">HTTPS</text>
+<rect class="box ext" x="390" y="230" width="150" height="50" rx="8"/>
+<text x="465.0" y="252" text-anchor="middle">AITask</text>
+<text x="465.0" y="268" text-anchor="middle" class="small">model · tokens · latency · status</text>
+<path class="arrow" d="M465,180 L465,230" marker-end="url(#a6-arr)"/>
+<text x="472" y="210" text-anchor="start" class="small">每次调用一条</text>
+<rect class="box warn2" x="580" y="110" width="150" height="70" rx="8"/>
+<text x="655.0" y="136" text-anchor="middle">AISuggestion</text>
+<text x="655.0" y="150" text-anchor="middle" class="small">status=pending</text>
+<text x="655.0" y="164" text-anchor="middle" class="small">payload · confidence</text>
+<path class="arrow" d="M540,145 L580,145" marker-end="url(#a6-arr)"/>
+<text x="560.0" y="139.0" text-anchor="middle" class="small">EnrichResult</text>
+<rect class="box soft" x="770" y="110" width="170" height="70" rx="8"/>
+<text x="855.0" y="136" text-anchor="middle">审核台 /ai/review/</text>
+<text x="855.0" y="150" text-anchor="middle" class="small">当前值 vs 建议值</text>
+<text x="855.0" y="164" text-anchor="middle" class="small">字段级勾选</text>
+<path class="arrow" d="M730,145 L770,145" marker-end="url(#a6-arr)"/>
+<rect class="box bad2" x="770" y="230" width="170" height="50" rx="8"/>
+<text x="855.0" y="252" text-anchor="middle">reject：记录原因</text>
+<text x="855.0" y="268" text-anchor="middle" class="small">反馈到提示词优化</text>
+<path class="arrow" d="M855,180 L855,230" marker-end="url(#a6-arr)"/>
+<text x="862" y="210" text-anchor="start" class="small">拒绝</text>
+<path class="arrow hi" d="M790,180 L790,300 L90,300 L90,180" marker-end="url(#a6-arrh)"/>
+<text x="440" y="316" text-anchor="middle" class="small">accept()：只写勾选字段 · source=ai · confidence · 重算完整度</text>
+</svg>
+<figcaption>图 A6 · AI 补全的数据流。模型输出先落成 AISuggestion，只有审核台的 accept() 这一条蓝色路径能把内容写回 Part。</figcaption>
+</figure>
+<!-- /fig:a6 -->
 <h2 id="s9">9. 安全与数据治理</h2>
 <ul>
 <li><b>三字段治理</b>：所有可被 AI 或导入影响的实体带 <code>source</code>（manual / import / ai）、<code>confidence</code>（0–1）、<code>verified</code>（人工确认）。查询结果与导出按 verified 与 status 过滤。</li>
@@ -492,6 +925,49 @@ python manage.py qcluster
 </code></pre>
 <p>whitenoise 服务静态文件，媒体文件由 Django 在 DEBUG 关闭时通过一个受登录保护的视图返回（演示规模足够）。提供 <code>scripts/demo_up.sh</code> 一键执行上述步骤。</p>
 
+<!-- fig:a8 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="演示环境的进程与网络拓扑">
+<defs><marker id="a8-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="a8-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="110" width="150" height="60" rx="8"/>
+<text x="95.0" y="138" text-anchor="middle">销售 / 采购的浏览器</text>
+<text x="95.0" y="152" text-anchor="middle" class="small">办公网</text>
+<rect class="lane" x="220" y="14" width="530" height="272" rx="10"/>
+<text x="232" y="32" class="lane-label">演示机（一台）</text>
+<rect class="box soft" x="250" y="60" width="200" height="60" rx="8"/>
+<text x="350.0" y="88" text-anchor="middle">gunicorn · Django</text>
+<text x="350.0" y="102" text-anchor="middle" class="small">whitenoise 服务静态文件</text>
+<path class="arrow" d="M170,140 L250,90" marker-end="url(#a8-arr)"/>
+<text x="180" y="110" text-anchor="start" class="small">:8000 HTTP</text>
+<rect class="box soft" x="250" y="150" width="200" height="60" rx="8"/>
+<text x="350.0" y="178" text-anchor="middle">qcluster</text>
+<text x="350.0" y="192" text-anchor="middle" class="small">django-q2 worker · 批量任务</text>
+<rect class="box ext" x="490" y="60" width="230" height="60" rx="8"/>
+<text x="605.0" y="88" text-anchor="middle">docker: postgres:16</text>
+<text x="605.0" y="102" text-anchor="middle" class="small">卷 pgdata · pg_trgm · 任务表</text>
+<rect class="box ext" x="490" y="150" width="230" height="50" rx="8"/>
+<text x="605.0" y="172" text-anchor="middle">media/</text>
+<text x="605.0" y="188" text-anchor="middle" class="small">上传文件 · 图片 · 生成的 Excel</text>
+<rect class="box ext" x="250" y="232" width="470" height="40" rx="6"/>
+<text x="485.0" y="256" text-anchor="middle">.env：密钥、DATABASE_URL、模型配置（不入 git）</text>
+<path class="arrow" d="M450,80 L490,80" marker-end="url(#a8-arr)"/>
+<text x="470" y="73" text-anchor="middle" class="small">SQL</text>
+<path class="arrow" d="M450,165 L470,165 L470,100 L490,100" marker-end="url(#a8-arr)"/>
+<text x="474" y="147" text-anchor="start" class="small">任务表</text>
+<path class="arrow" d="M400,120 L400,135 L560,135 L560,150" marker-end="url(#a8-arr)"/>
+<text x="480" y="131" text-anchor="middle" class="small">读写</text>
+<path class="arrow" d="M450,190 L490,190" marker-end="url(#a8-arr)"/>
+<text x="470" y="205" text-anchor="middle" class="small">读写</text>
+<rect class="box ext" x="780" y="60" width="110" height="60" rx="8"/>
+<text x="835.0" y="88" text-anchor="middle">大模型接口</text>
+<text x="835.0" y="102" text-anchor="middle" class="small">互联网</text>
+<path class="arrow" d="M350,60 L350,40 L835,40 L835,60" marker-end="url(#a8-arr)" stroke-dasharray="5 4"/>
+<text x="590" y="34" text-anchor="middle" class="small">HTTPS，仅送产品公开属性与照片</text>
+<path class="arrow" d="M350,210 L350,220 L760,220 L760,100 L780,100" marker-end="url(#a8-arr)" stroke-dasharray="5 4"/>
+</svg>
+<figcaption>图 A8 · 演示部署：一台机器上两个 Python 进程加一个 docker 里的 PostgreSQL；只有大模型调用出互联网。</figcaption>
+</figure>
+<!-- /fig:a8 -->
 <h2 id="s13">13. 演进路线</h2>
 <div class="tbl"><table>
 <tr><th>阶段</th><th>内容</th><th>触发条件</th></tr>
