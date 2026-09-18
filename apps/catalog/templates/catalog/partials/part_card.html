@@ -1,4 +1,4 @@
-{% load catalog_tags %}
+{% load catalog_tags supplier_tags %}
 {% with image=part|primary_image oe=part|numbers_of_kind:"OE" cross=part|numbers_of_kind:"CROSS" %}
 <article class="mb-3 rounded-lg border border-slate-200 bg-white p-4 flex flex-col sm:flex-row gap-4">
   <a href="{% url 'catalog:part_detail' part.sku %}" class="shrink-0">
@@ -32,8 +32,11 @@
       <dd class="break-words">{% for n in cross|slice:":4" %}<code class="mr-2">{{ n.number }}</code>{% if n.brand %}<span class="text-xs text-slate-400 mr-3">{{ n.brand }}</span>{% endif %}{% empty %}<span class="text-slate-400">—</span>{% endfor %}</dd>
       <dt class="text-slate-500">适配</dt>
       <dd>{% for f in part.fitments.all|slice:":3" %}<span class="mr-3">{{ f }}</span>{% empty %}<span class="text-red-600">缺</span>{% endfor %}</dd>
-      <dt class="text-slate-500">成本 / 售价</dt>
-      <dd class="text-slate-400">暂无供应商报价</dd>
+      <dt class="text-slate-500">{% if can_view_cost %}成本 / 售价{% else %}建议售价{% endif %}</dt>
+      <dd>{% with offer=part|best_offer %}{% if offer %}
+        {% if can_view_cost %}<span>${{ offer.unit_cost_usd }}</span> <span class="text-slate-400">→</span> {% endif %}<span class="font-semibold">${{ offer.unit_cost_usd|suggested_price }}</span>
+        <span class="text-xs text-slate-500 ml-2">{% if offer.moq %}MOQ {{ offer.moq }} · {% endif %}{% if offer.lead_days %}{{ offer.lead_days }} 天 · {% endif %}{{ part.offers.all|length }} 家报价</span>
+      {% else %}<span class="text-slate-400">暂无供应商报价</span>{% endif %}{% endwith %}</dd>
     </dl>
   </div>
 </article>

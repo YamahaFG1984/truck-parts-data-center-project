@@ -19,7 +19,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--reset",
             action="store_true",
-            help="先清空全部产品目录数据（产品、编号、适配、图片、分类、品牌）再生成。",
+            help="先清空全部产品目录与供应商数据（产品、编号、适配、图片、分类、品牌、供应商、报价）再生成。",
         )
         parser.add_argument("--parts", type=int, default=400, help="产品数量，默认 400。")
         parser.add_argument(
@@ -30,11 +30,16 @@ class Command(BaseCommand):
         if Part.objects.exists() and not options["reset"]:
             raise CommandError("产品目录已有数据。确认要清空重建请加 --reset。")
 
+        # Suppliers depend on catalog, not the other way round: import at run time.
+        from apps.suppliers.demo import reset_suppliers, seed_offers
+
         with transaction.atomic():
             if options["reset"]:
                 reset_catalog()
-                self.stdout.write("已清空产品目录。")
+                reset_suppliers()
+                self.stdout.write("已清空产品目录与供应商。")
             result = seed_catalog(parts=options["parts"], seed=options["seed"])
+            offers = seed_offers(seed=options["seed"])
 
         excel = write_supplier_excel(
             Path(settings.MEDIA_ROOT) / "demo" / "supplier_quote_messy.xlsx",
@@ -46,7 +51,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"生成 {result.parts} 个产品、{result.numbers + result.duplicate_groups} 条编号"
                 f"（含 {result.duplicate_groups} 组疑似重复）、{result.fitments} 条适配、"
-                f"{result.images} 张图片。"
+                f"{result.images} 张图片、{offers} 条供应商报价（另含同数量的供应商料号）。"
             )
         )
         self.stdout.write(f"乱格式供应商报价单：{excel}")

@@ -101,7 +101,8 @@ def test_search_with_full_page_of_results_stays_within_query_budget(
     for i in range(MAX_RESULTS + 5):
         _card_part(i)
 
-    # session + user + matcher levels (<=3) + numbers + fitments + images
+    # session + user + matcher levels (2 here: L1 empty, L2 fills the page so L3 is
+    # skipped) + numbers + fitments + images + offers
     with django_assert_max_num_queries(8):
         response = user_client.get(SEARCH, {"q": "88880"})
 
@@ -127,8 +128,9 @@ def test_part_detail_query_count_is_bounded(user_client, django_assert_max_num_q
         alt = _card_part(i)
         PartNumberFactory(part=alt, number="20443906", kind="OE")
 
-    # session, user, part+category, numbers, fitments, images, alternatives + 3 card prefetches
-    with django_assert_max_num_queries(10):
+    # session, user, part+category, numbers, fitments, images, offers, offer suppliers,
+    # alternatives + 4 card prefetches (numbers, fitments, images, offers)
+    with django_assert_max_num_queries(13):
         response = user_client.get(reverse("catalog:part_detail", args=[pad.sku]))
 
     assert len(response.context["alternatives"]) == 5

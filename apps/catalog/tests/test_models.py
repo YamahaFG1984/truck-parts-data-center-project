@@ -245,7 +245,8 @@ def test_with_related_uses_fixed_query_count(django_assert_num_queries):
         FitmentFactory(part=part)
         PartImageFactory(part=part)
 
-    with django_assert_num_queries(4):  # parts+category, numbers+brand, fitments, images
+    # parts+category, numbers+brand, fitments, images, offers (suppliers app, M09)
+    with django_assert_num_queries(5):
         for part in Part.objects.with_related():
             [n.brand for n in part.numbers.all()]
             list(part.fitments.all())

@@ -8,6 +8,7 @@ from openpyxl import load_workbook
 
 from apps.catalog.models import Brand, Category, Fitment, Part, PartImage, PartNumber
 from apps.catalog.services.normalize import normalize_number
+from apps.suppliers.models import Supplier, SupplierOffer
 
 pytestmark = pytest.mark.django_db
 
@@ -22,12 +23,16 @@ def snapshot():
         (
             p.sku, p.name_en, p.category.name if p.category else None, p.status, p.attributes,
             p.packaging, p.description_en,
-            sorted((n.number, n.kind, n.brand.name) for n in p.numbers.all()),
+            sorted((n.number, n.kind, n.brand.name if n.brand else None) for n in p.numbers.all()),
             sorted((f.make, f.model, f.engine, f.year_from, f.year_to) for f in p.fitments.all()),
             sorted((i.image.name, i.is_primary) for i in p.images.all()),
+            sorted(
+                (o.supplier.name, o.supplier_pn, o.unit_cost_usd, o.moq, o.lead_days, o.quoted_at)
+                for o in p.offers.all()
+            ),
         )
         for p in Part.objects.select_related("category").prefetch_related(
-            "numbers__brand", "fitments", "images"
+            "numbers__brand", "fitments", "images", "offers__supplier"
         )
     ]
 
@@ -40,7 +45,10 @@ def test_seed_demo_volume_and_dirty_data(settings):
     assert Category.objects.filter(parent__isnull=False).count() == 12
     assert Brand.objects.filter(kind="oem").count() == 10
     assert Brand.objects.filter(kind="aftermarket").count() == 8
-    assert 750 <= PartNumber.objects.count() <= 1100
+    # ~900 OE / cross numbers + one supplier number per quote (~500, added in M09)
+    assert 1200 <= PartNumber.objects.count() <= 1650
+    assert 450 <= SupplierOffer.objects.count() <= 650
+    assert Supplier.objects.count() == 6
     assert 450 <= Fitment.objects.count() <= 700
 
     def share(item):
@@ -51,6 +59,7 @@ def test_seed_demo_volume_and_dirty_data(settings):
     assert 0.14 <= share("category") <= 0.26
     assert 0.23 <= share("fitment") <= 0.37
     assert 0.09 <= share("description") <= 0.21
+    assert 0.18 <= share("offer") <= 0.32
 
     numbers = list(PartNumber.objects.values_list("number", flat=True))
     assert any("-" in n for n in numbers)

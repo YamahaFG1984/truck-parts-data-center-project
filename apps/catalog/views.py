@@ -38,7 +38,7 @@ class PartDetailView(DetailView):
     context_object_name = "part"
 
     def get_queryset(self):
-        return Part.objects.with_related()
+        return Part.objects.with_related().prefetch_related("offers__supplier")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
