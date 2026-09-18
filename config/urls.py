@@ -9,6 +9,7 @@ urlpatterns = [
     path("", include("apps.catalog.urls")),
     path("", include("apps.importer.urls")),
     path("", include("apps.ai.urls")),
+    path("", include("apps.inquiries.urls")),
     path("", include("apps.core.urls")),
 ]
 

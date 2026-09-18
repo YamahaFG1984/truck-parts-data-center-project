@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "apps.suppliers",
     "apps.importer",
     "apps.ai",
+    "apps.inquiries",
 ]
 
 MIDDLEWARE = [
