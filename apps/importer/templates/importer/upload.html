@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}导入供应商数据 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-1">导入供应商数据</h1>
+<p class="text-sm text-slate-500 mb-4">上传供应商的报价单或产品表。系统会自动找到表头（前面有公司抬头也没关系），所有单元格按文本读取，编号不会丢前导 0 或变成科学计数。</p>
+{% include "importer/_steps.html" with current=1 %}
+
+<form method="post" enctype="multipart/form-data" class="rounded-lg border border-slate-200 bg-white p-5 space-y-4 max-w-xl">
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="text-sm text-red-700">{{ form.non_field_errors }}</div>{% endif %}
+  {% for field in form %}
+  <div>
+    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<p class="text-xs text-slate-500 mt-1">{{ field.help_text }}</p>{% endif %}
+    {% for error in field.errors %}<p class="text-sm text-red-700 mt-1">{{ error }}</p>{% endfor %}
+  </div>
+  {% endfor %}
+  <button type="submit" class="rounded bg-blue-700 px-5 py-2 text-white hover:bg-blue-800">上传并预览</button>
+</form>
+
+<section class="mt-8">
+  <h2 class="font-semibold mb-2">最近的导入</h2>
+  {% if recent %}
+  <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3">#</th><th class="py-2 px-3">文件</th><th class="py-2 px-3 hidden sm:table-cell">供应商</th><th class="py-2 px-3">状态</th><th class="py-2 px-3 hidden sm:table-cell">上传</th></tr></thead>
+    <tbody>
+    {% for b in recent %}
+      <tr class="border-t border-slate-100">
+        <td class="py-1 px-3">{{ b.pk }}</td>
+        <td class="py-1 px-3 break-all"><a href="{% url 'importer:preview' b.pk %}" class="text-blue-700 hover:underline">{{ b.original_name }}</a></td>
+        <td class="py-1 px-3 hidden sm:table-cell">{{ b.supplier|default:"—" }}</td>
+        <td class="py-1 px-3">{{ b.get_status_display }}</td>
+        <td class="py-1 px-3 hidden sm:table-cell text-slate-500">{{ b.created_by|default:"" }} {{ b.created_at|date:"m-d H:i" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="text-sm text-slate-400">还没有导入记录。可以先用演示报价单试试：<code>media/demo/supplier_quote_messy.xlsx</code></p>{% endif %}
+</section>
+{% endblock %}
