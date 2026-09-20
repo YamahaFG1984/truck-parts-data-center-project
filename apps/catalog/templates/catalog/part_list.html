@@ -19,7 +19,16 @@
 <div class="mb-3 flex flex-wrap items-center gap-3 text-sm">
   <button type="submit" class="rounded bg-violet-700 px-4 py-1.5 text-white hover:bg-violet-800 disabled:bg-slate-300" :disabled="picked === 0">批量 AI 补全</button>
   <span class="text-slate-500"><span x-text="picked">0</span> 个已选，每次最多 50 个；结果进 AI 审核台。</span>
+  <span class="ml-auto flex items-center gap-2">
+    <label for="platform" class="text-slate-500">上架导出</label>
+    <select id="platform" name="platform" class="rounded border border-slate-300 px-2 py-1.5">
+      <option value="alibaba">Alibaba</option>
+      <option value="shopify">Shopify</option>
+    </select>
+    <button type="submit" formaction="{% url 'inquiries:export' %}" class="rounded bg-emerald-700 px-4 py-1.5 text-white hover:bg-emerald-800 disabled:bg-slate-300" :disabled="picked === 0">导出 CSV</button>
+  </span>
 </div>
+<p class="mb-3 text-sm text-slate-500">导出只包含已审核且有主图的 SKU，被排除的会在页面顶部说明原因。</p>
 <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
 <table class="w-full text-sm">
   <thead class="bg-slate-50 text-left text-slate-500">

@@ -5,6 +5,7 @@ from . import views
 app_name = "inquiries"
 
 urlpatterns = [
+    path("export/", views.ExportView.as_view(), name="export"),
     path("inquiry/", views.InquiryListView.as_view(), name="list"),
     path("inquiry/image/", views.ImageInquiryView.as_view(), name="image"),
     path("inquiry/<int:pk>/quote/", views.QuoteView.as_view(), name="quote"),
