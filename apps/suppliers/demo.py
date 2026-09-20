@@ -29,6 +29,10 @@ COST_RANGE = {  # USD per unit, by category code
     "MIR": (25, 90), "TRB": (180, 600),
 }
 FIRST_QUOTE = dt.date(2026, 6, 1)
+# The offline photo demo (apps/ai/prompts/image_identify.example.json) lands on the
+# part carrying this OE number, and the demo script then quotes it — so it must have
+# a quote even if the random pass skipped it. A test keeps the two files in sync.
+SHOWCASE_OE = "26570367"
 
 
 def reset_suppliers() -> None:
@@ -68,4 +72,18 @@ def seed_offers(seed: int, share: float = 0.75) -> int:
                                       source="import"))
     SupplierOffer.objects.bulk_create(offers)
     PartNumber.objects.bulk_create(numbers)
-    return len(offers)
+    return len(offers) + _ensure_showcase_offer(suppliers[0][0], rng)
+
+
+def _ensure_showcase_offer(supplier: Supplier, rng: random.Random) -> int:
+    part = Part.objects.filter(numbers__number_norm=SHOWCASE_OE, numbers__kind="OE").first()
+    if part is None or part.offers.exists():
+        return 0
+    supplier_pn = f"HB-{rng.randint(1000, 9999)}"
+    SupplierOffer.objects.create(
+        supplier=supplier, part=part, supplier_pn=supplier_pn,
+        unit_cost_usd=Decimal(str(round(rng.uniform(*COST_RANGE["BCH"]), 2))),
+        moq=50, lead_days=25, quoted_at=FIRST_QUOTE,
+    )
+    PartNumber.objects.create(part=part, number=supplier_pn, kind="SUPPLIER", source="import")
+    return 1

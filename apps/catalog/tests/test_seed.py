@@ -1,3 +1,4 @@
+import json
 from io import StringIO
 from pathlib import Path
 
@@ -126,3 +127,41 @@ def test_supplier_excel_layout(settings):
     assert sum(1 for r in data if r[1] and normalize_number(r[1]) in catalog) == 10
     assert sum(1 for r in data if not r[1]) == 3
     assert sum(1 for r in data if isinstance(r[6], str)) == 2
+
+
+def test_the_photo_demo_lands_on_a_part_that_can_be_quoted(settings, tmp_path):
+    """DEMO_SCRIPT step 4 goes photo -> confirm -> quote, so the part the offline
+    vision example points at must have a supplier offer."""
+    settings.MEDIA_ROOT = tmp_path
+    from apps.ai.prompts.loader import example_output
+    from apps.suppliers.demo import SHOWCASE_OE
+
+    example = json.loads(example_output("image_identify"))
+    assert normalize_number(example["visible_numbers"][0]) == SHOWCASE_OE
+
+    seed()
+
+    part = Part.objects.get(numbers__number_norm=SHOWCASE_OE, numbers__kind="OE")
+    assert part.offers.exists()
+
+
+def test_reset_after_a_demo_run_with_quotations(settings, tmp_path, django_user_model):
+    """A demo leaves inquiries and quote lines behind; QuoteLine PROTECTs its part,
+    so --reset has to clear them first (DEMO_SCRIPT's "回到初始状态" fallback)."""
+    from decimal import Decimal
+
+    from apps.inquiries.models import Inquiry, QuoteLine
+    from apps.suppliers.services.quoting import best_offer
+
+    settings.MEDIA_ROOT = tmp_path
+    seed()
+    part = Part.objects.filter(offers__isnull=False).first()
+    inquiry = Inquiry.objects.create(input_type="text", raw_input="4020269", matched_part=part)
+    QuoteLine.objects.create(inquiry=inquiry, part=part, offer=best_offer(part), qty=50,
+                             unit_cost_usd=Decimal("22.90"), margin=Decimal("0.250"),
+                             unit_price_usd=Decimal("28.63"))
+
+    seed("--reset")
+
+    assert Part.objects.count() == 400
+    assert not Inquiry.objects.exists() and not QuoteLine.objects.exists()

@@ -50,8 +50,8 @@
   </section>
 
   <section class="lg:col-span-2">
-    <h2 class="font-semibold mb-1">候选 <span class="text-sm font-normal text-violet-700">待确认</span></h2>
-    <p class="text-sm text-slate-500 mb-3">按匹配程度排序。确认之前，询价记录里不会写入任何产品。</p>
+    <h2 class="font-semibold mb-1">候选 {% if not inquiry.matched_part %}<span class="text-sm font-normal text-violet-700">待确认</span>{% endif %}</h2>
+    <p class="text-sm text-slate-500 mb-3">{% if inquiry.matched_part %}已确认的产品见左侧；换一个候选只要点它的“确认是这个产品”。{% else %}按匹配程度排序。确认之前，询价记录里不会写入任何产品。{% endif %}</p>
     {% for candidate in candidates %}
       <div class="mb-3">
         {% include "catalog/partials/part_card.html" with part=candidate.part %}

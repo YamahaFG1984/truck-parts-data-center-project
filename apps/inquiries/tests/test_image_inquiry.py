@@ -183,8 +183,10 @@ def test_confirming_a_candidate_records_it(admin_client, chamber):
                                  {"part": chamber.pk}, follow=True)
 
     inquiry.refresh_from_db()
+    body = response.content.decode()
     assert (inquiry.matched_part, inquiry.status) == (chamber, "matched")
-    assert "已确认为 FIT-BCH-00001" in response.content.decode()
+    assert "已确认为 FIT-BCH-00001" in body
+    assert "待确认" not in body  # the heading stops asking once something is confirmed
 
 
 def test_only_proposed_parts_can_be_confirmed(admin_client, chamber):

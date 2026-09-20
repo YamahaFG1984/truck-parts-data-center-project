@@ -1,17 +1,42 @@
+from django.conf import settings
 from django.views.generic import DetailView, TemplateView
 
+from apps.ai.models import AISuggestion
 from apps.catalog.services.quality import MISSING_LABELS, duplicates, summary
+from apps.inquiries.models import Inquiry
 
 from .jobs import worker_missing
 from .models import Job
 
 MAX_DUPLICATE_GROUPS = 50
+RECENT_INQUIRIES = 6
+TOP_MISSING = 4
 
 
 class HomeView(TemplateView):
-    """Placeholder home page; the real dashboard arrives in M20."""
+    """Where the demo starts: one search box, the data health numbers, what is
+    waiting for review, and the latest inquiries."""
 
     template_name = "core/home.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        stats = summary()
+        by_count = sorted(stats["missing"].items(), key=lambda kv: -kv[1])
+        context.update(
+            stats=stats,
+            # Empty on an empty database, so the page says "seed the demo data"
+            # instead of showing four bars that are all zero.
+            top_missing=[
+                {"key": key, "label": MISSING_LABELS[key], "count": count,
+                 "percent": round(100 * count / stats["total"])}
+                for key, count in by_count[:TOP_MISSING]
+            ] if stats["total"] else [],
+            pending=AISuggestion.objects.filter(status=AISuggestion.Status.PENDING).count(),
+            inquiries=Inquiry.objects.settled().select_related("matched_part")[:RECENT_INQUIRIES],
+            mock=settings.LLM_PROVIDER == "mock",
+        )
+        return context
 
 
 class QualityDashboardView(TemplateView):

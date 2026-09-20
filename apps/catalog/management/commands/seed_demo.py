@@ -31,8 +31,10 @@ class Command(BaseCommand):
         if Part.objects.exists() and not options["reset"]:
             raise CommandError("产品目录已有数据。确认要清空重建请加 --reset。")
 
-        # Suppliers and importer depend on catalog, not the other way round: import at run time.
+        # Suppliers, importer and inquiries depend on catalog, not the other way
+        # round: import at run time.
         from apps.importer.models import ImportBatch
+        from apps.inquiries.models import Inquiry
         from apps.suppliers.demo import reset_suppliers, seed_offers
 
         with transaction.atomic():
@@ -40,9 +42,12 @@ class Command(BaseCommand):
                 for batch in ImportBatch.objects.all():  # batches PROTECT their supplier
                     batch.file.delete(save=False)
                 ImportBatch.objects.all().delete()
+                for inquiry in Inquiry.objects.exclude(image=""):  # photos on disk
+                    inquiry.image.delete(save=False)
+                Inquiry.objects.all().delete()  # quote lines PROTECT their part
                 reset_catalog()
                 reset_suppliers()
-                self.stdout.write("已清空产品目录、供应商与导入记录。")
+                self.stdout.write("已清空产品目录、供应商、导入记录与询价记录。")
             result = seed_catalog(parts=options["parts"], seed=options["seed"])
             offers = seed_offers(seed=options["seed"])
             recompute()

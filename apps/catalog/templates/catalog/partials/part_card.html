@@ -25,15 +25,17 @@
     </h2>
     <p class="text-sm text-slate-500 mb-2">{{ part.category|default:"未分类" }}{% if part.name_zh %} · {{ part.name_zh }}{% endif %}</p>
 
-    <dl class="grid grid-cols-[4.5rem_1fr] gap-x-2 gap-y-1 text-sm">
+    {# minmax(0,1fr): without it the value column cannot shrink and long number
+       lists push the card past a phone screen. #}
+    <dl class="grid grid-cols-[4.5rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-sm">
       <dt class="text-slate-500">OE 号</dt>
       <dd class="break-words">{% for n in oe|slice:":4" %}<code class="mr-2">{{ n.number }}</code>{% if n.brand %}<span class="text-xs text-slate-400 mr-3">{{ n.brand }}</span>{% endif %}{% empty %}<span class="text-red-600">缺</span>{% endfor %}{% if oe|length > 4 %}<span class="text-xs text-slate-400">等 {{ oe|length }} 个</span>{% endif %}</dd>
       <dt class="text-slate-500">互换号</dt>
       <dd class="break-words">{% for n in cross|slice:":4" %}<code class="mr-2">{{ n.number }}</code>{% if n.brand %}<span class="text-xs text-slate-400 mr-3">{{ n.brand }}</span>{% endif %}{% empty %}<span class="text-slate-400">—</span>{% endfor %}</dd>
       <dt class="text-slate-500">适配</dt>
-      <dd>{% for f in part.fitments.all|slice:":3" %}<span class="mr-3">{{ f }}</span>{% empty %}<span class="text-red-600">缺</span>{% endfor %}</dd>
+      <dd class="break-words">{% for f in part.fitments.all|slice:":3" %}<span class="mr-3">{{ f }}</span>{% empty %}<span class="text-red-600">缺</span>{% endfor %}</dd>
       <dt class="text-slate-500">{% if can_view_cost %}成本 / 售价{% else %}建议售价{% endif %}</dt>
-      <dd>{% with offer=part|best_offer %}{% if offer %}
+      <dd class="break-words">{% with offer=part|best_offer %}{% if offer %}
         {% if can_view_cost %}<span>${{ offer.unit_cost_usd }}</span> <span class="text-slate-400">→</span> {% endif %}<span class="font-semibold">${{ offer.unit_cost_usd|suggested_price }}</span>
         <span class="text-xs text-slate-500 ml-2">{% if offer.moq %}MOQ {{ offer.moq }} · {% endif %}{% if offer.lead_days %}{{ offer.lead_days }} 天 · {% endif %}{{ part.offers.all|length }} 家报价</span>
       {% else %}<span class="text-slate-400">暂无供应商报价</span>{% endif %}{% endwith %}</dd>
