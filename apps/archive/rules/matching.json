@@ -1,0 +1,19 @@
+{
+  "_comment": "Matching parameters, owned by the archive lead. Changes take effect after `manage.py archive_rematch`; decided items stay decided unless their evidence changes. Part-type and position words live in apps/sources/rules/vocabulary.json.",
+  "version": "2026-09-22.1",
+  "recall_number_kinds": ["oe"],
+  "min_number_length": 5,
+  "dims_tolerance_cm": 1.0,
+  "max_block_size": 200,
+  "incomplete_fields": ["part_type", "position", "fitment", "dims", "price", "currency", "moq", "quote_date"],
+  "actions": {
+    "strong": "逐项核对后确认为同一产品（强证据条目可以勾选后批量确认）。",
+    "no_number": "没有共同编号佐证：向供应商索取 OE 号或实物图，确认后再归一。",
+    "same_source": "同一供应商的两条记录关键字段一致：向供应商确认是否重复报价。",
+    "number_conflict": "共享编号但品类不同：核对目录或图片，OE 可能录错或一号多品；通常判为不同产品，并标注该编号存疑。",
+    "position_conflict": "共享编号但左右不同：确认该编号是否左右通用；通常判为不同产品（左右件）。",
+    "spec_conflict": "共享编号但适配或尺寸不同：核对该编号是否跨车型、跨尺寸通用；无法确认时判为不同产品。",
+    "insufficient": "关键字段缺失，无法判断：补充后重新匹配。",
+    "incomplete": "向供应商补充缺失字段；补齐前该记录作为独立产品保留。"
+  }
+}

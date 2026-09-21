@@ -1,6 +1,7 @@
 """Preview and first ingest of a mapped file (docs/archive-design.html §5 steps 4–6).
 
-preview() never writes records. commit() writes them all in one transaction, or none.
+preview() never writes records. commit() writes them all in one transaction, or none;
+records_committed is sent inside that transaction so the archive's work is part of it.
 Records whose identity the supplier already has are refused here; incremental import
 with version comparison is M27.
 """
@@ -11,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from ..models import RecordNumber, SourceFile, SourceRecord
+from ..signals import records_committed
 from . import intake
 from .standardize import LABELS, Standardized, standardize
 
@@ -99,6 +101,8 @@ def commit(source_file: SourceFile, user) -> int:
         source_file.stats = source_file.stats | {"committed": _counts(planned) | {
             "by": user.pk, "at": timezone.now().isoformat()}}
         source_file.save(update_fields=["status", "stats", "updated_at"])
+        records_committed.send(sender=SourceFile, source_file=source_file, records=records,
+                               user=user)
     return len(records)
 
 

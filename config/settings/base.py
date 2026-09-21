@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     "apps.ai",
     "apps.inquiries",
     "apps.sources",
+    "apps.archive",
 ]
 
 MIDDLEWARE = [

@@ -37,14 +37,14 @@ def test_preview_writes_nothing(user):
 
     planned = ingest.preview(source)
 
-    assert len(planned) == 10 and not SourceRecord.objects.exists()
-    assert source.status == "previewed" and source.stats["preview"]["rows"] == 10
+    assert len(planned) == 11 and not SourceRecord.objects.exists()
+    assert source.status == "previewed" and source.stats["preview"]["rows"] == 11
 
 
 def test_commit_stores_every_row_with_its_locator_and_lineage(user):
     source = mapped(workbook_x(), user)
 
-    assert ingest.commit(source, user) == 10
+    assert ingest.commit(source, user) == 11
 
     record = SourceRecord.objects.get(record_key="X-002")
     assert (record.locator, record.sheet, record.row_no) == ("Price List!R3", "Price List", 3)
@@ -56,7 +56,7 @@ def test_commit_stores_every_row_with_its_locator_and_lineage(user):
     assert record.fields["price"]["sources"][0] == {"column": "Unit Price", "cell": "H3",
                                                     "raw": "51.01"}
     assert any("与币种 EUR 不一致" in w for w in record.warnings)
-    assert source.status == "committed" and source.stats["committed"]["rows"] == 10
+    assert source.status == "committed" and source.stats["committed"]["rows"] == 11
 
 
 def test_numbers_are_indexed_for_search(user):
@@ -126,7 +126,7 @@ def test_a_file_is_committed_once(user):
 
     with pytest.raises(IngestError, match="已经入库"):
         ingest.commit(source, user)
-    assert SourceRecord.objects.count() == 10
+    assert SourceRecord.objects.count() == 11
 
 
 def test_a_failure_half_way_leaves_nothing_behind(user, monkeypatch):
@@ -178,12 +178,12 @@ class TestPages:
         url = reverse("sources:preview", args=[source.pk])
 
         body = ops.get(url).content.decode()
-        assert "Price List!R3" in body and "缺单价" in body and "确认入库 10 条" in body
+        assert "Price List!R3" in body and "缺单价" in body and "确认入库 11 条" in body
         assert not SourceRecord.objects.exists()
 
         response = ops.post(url, follow=True)
-        assert "已入库 10 条来源记录" in response.content.decode()
-        assert SourceRecord.objects.count() == 10
+        assert "已入库 11 条来源记录" in response.content.decode()
+        assert SourceRecord.objects.count() == 11
 
     def test_mapping_cannot_change_after_commit(self, ops, user):
         source = mapped(workbook_x(), user)

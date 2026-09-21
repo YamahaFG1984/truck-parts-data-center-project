@@ -12,6 +12,8 @@ the rows are paired so that each trap appears at least once:
     name substring  X-007 Air Filter Housing vs Y-004 Air Filter Housing Cap, OE-SHR-0002
     OE, other side  X-008 Left vs Y-005 Right, shared OE-SHR-0003, same size
     in-file sides   Y-006 Left vs Y-007 Right, shared OE-TST-9010, Y-006 lacks years
+    insufficient    X-011 ~ Y-010  same type, side, size; Y-010 has no fitment at all
+                    X-011 ~ Y-006  same fitment and side; Y-006 has no years and no size
     side in column  Y-009 "Side Grille" named without side, Install Side = Right
     missing         X-009 no price or currency, X-010 no fitment or size,
                     Y-010 no fitment, Y-011 no MOQ
@@ -53,6 +55,8 @@ ROWS_X = [
     ["X-009", "X-09-00", "Front Grille", CENTURY, None, None, "124 x 77 x 10 cm",
      None, None, 2, _d(17)],
     ["X-010", "X-10-00", "Fan Shroud", None, None, None, None, 184.45, "USD", 10, _d(19)],
+    ["X-011", "X-11-L", "Left Side Grille", VN, "Left", None, "65 x 30 x 30 cm",
+     142.75, "USD", 2, _d(9)],
 ]
 
 # Source Ref, Brand Number, English Name, Fitment, Install Side, Cross Ref, Package,
@@ -91,3 +95,22 @@ def workbook_x() -> bytes:
 @functools.cache
 def workbook_y() -> bytes:
     return workbook_bytes(HEADERS_B, ROWS_Y, sheet="Catalog Export")
+
+
+def ingest_both(user):
+    """Archive, map (as suggested) and commit both suppliers' files; returns (x, y)."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    from apps.sources.services import ingest, intake
+    from apps.sources.services.storage import store_upload
+    from apps.suppliers.tests.factories import SupplierFactory
+
+    files = []
+    for name, data in (("Supplier X", workbook_x()), ("Supplier Y", workbook_y())):
+        source = store_upload(SimpleUploadedFile(f"{name}.xlsx", data),
+                              SupplierFactory(name=name), user)
+        intake.suggestions(source, intake.inspect(source))
+        intake.confirm(source, {}, user)
+        ingest.commit(source, user)
+        files.append(source)
+    return files
