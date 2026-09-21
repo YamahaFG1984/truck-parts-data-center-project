@@ -163,7 +163,7 @@
 <div class="tbl"><table>
 <tr><th>模型</th><th>关键字段</th><th>说明</th></tr>
 <tr><td><code>SourceFile</code></td><td>supplier、file（uuid 路径）、original_name、<b>sha256</b>、format（xlsx / csv / pdf）、status、mapping、stats、error</td><td>原件存档。同一供应商上传哈希相同的文件，提示"已导入过 #N"并拒绝重复入库。解析失败也保留原件与失败原因。</td></tr>
-<tr><td><code>SourceRecord</code></td><td>source_file、supplier、<b>record_key</b>、version、previous、change_type、is_current；定位：sheet、row_no、page、table_no；<b>raw</b>（原表头 → 原文）、<b>cells</b>（原表头 → 单元格坐标）、<b>fields</b>（标准字段 → 值 / 原文 / 列 / 单元格 / 规则 / 警告）、warnings；常用字段的类型化副本：supplier_sku、name、part_type、position、make、model、year_from、year_to、dims、price、currency、moq、quote_date</td><td>资料里的一行。<b>写入后不再修改</b>；供应商再发同一条记录时新建一个版本，以 previous 串成版本链。</td></tr>
+<tr><td><code>SourceRecord</code></td><td>source_file、supplier、<b>record_key</b>、version、previous（一对一，历史不分叉）、change_type；定位：locator（如 Sheet1!R12、P3/T1/R5，同一文件内唯一）以及 sheet、row_no、page、table_no；<b>raw</b>（原表头 → 原文）、<b>cells</b>（原表头 → 单元格坐标）、<b>fields</b>（标准字段 → 值 / 原文 / 列 / 单元格 / 规则 / 警告）、warnings；常用字段的类型化副本：supplier_sku、name、part_type、position、make、model、year_from、year_to、dims、price、currency、moq、quote_date</td><td>资料里的一行。<b>写入后不再修改</b>（save、delete、批量 update / delete 都会被拒绝）；供应商再发同一条记录时新建一个版本，以 previous 串成版本链。"当前版本"就是没有后继的那条，由查询得出，不设可变的 is_current 标记。</td></tr>
 <tr><td><code>RecordNumber</code></td><td>record、kind（supplier_sku / oe / source_id）、number、number_norm</td><td>编号索引，复用第一阶段的 <code>normalize_number()</code>，供查询与召回使用。</td></tr>
 <tr><td><code>MappingTemplate</code></td><td>supplier、header_signature、columns、confirmed_by</td><td>人工确认过的列映射。同一供应商下次来同样表头的文件时直接套用。</td></tr>
 </table></div>

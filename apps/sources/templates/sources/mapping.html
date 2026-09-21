@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}列映射 · {{ source.original_name }}{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{% url 'sources:list' %}" class="hover:text-blue-700">资料归档</a> / <a href="{% url 'sources:detail' source.pk %}" class="hover:text-blue-700">#{{ source.pk }}</a> / 列映射</nav>
+<h1 class="text-2xl font-bold mb-1 break-all">{{ source.original_name }}</h1>
+<p class="text-sm text-slate-500 mb-4">依次采用：该供应商已确认的模板、同义词表、AI 建议。<b>每一列都要你确认</b>；确认后存为 {{ source.supplier }} 的模板，下次同样表头的文件直接沿用。</p>
+
+{% if errors %}
+<ul class="mb-4 space-y-1 rounded border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-800">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+<form method="post">
+  {% csrf_token %}
+  {% for sheet in sheets %}
+  {% with si=forloop.counter0 %}
+  <h2 class="font-semibold mt-4 mb-2">工作表 {{ sheet.name }} <span class="text-sm font-normal text-slate-500">表头在第 {{ sheet.header_row }} 行</span></h2>
+  <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+  <table class="w-full text-sm">
+    <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3">表头</th><th class="py-2 px-3 hidden md:table-cell">样例</th><th class="py-2 px-3">标准字段</th><th class="py-2 px-3">依据</th></tr></thead>
+    <tbody>
+    {% for column in sheet.columns %}
+      <tr class="border-t border-slate-100 align-top">
+        <td class="py-2 px-3 font-medium whitespace-nowrap">{{ column.header }}</td>
+        <td class="py-2 px-3 hidden md:table-cell text-slate-500">{% for s in column.samples %}<div class="truncate max-w-[14rem]">{{ s|default:"·" }}</div>{% endfor %}</td>
+        <td class="py-2 px-3">
+          <select name="field__{{ si }}__{{ forloop.counter0 }}" class="rounded border border-slate-300 px-2 py-1 {% if column.field == 'ignore' %}text-slate-400{% endif %}">
+            {% for value, label in fields.items %}<option value="{{ value }}"{% if value == column.field %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </td>
+        <td class="py-2 px-3 text-xs">
+          {% if column.source == "template" %}<span class="rounded bg-emerald-100 text-emerald-800 px-2 py-0.5">模板</span>
+          {% elif column.source == "synonym" %}<span class="rounded bg-emerald-100 text-emerald-800 px-2 py-0.5">同义词</span>
+          {% elif column.source == "ai" %}<span class="rounded bg-violet-100 text-violet-800 px-2 py-0.5">AI</span>
+          {% elif column.source == "manual" %}<span class="rounded bg-blue-100 text-blue-800 px-2 py-0.5">人工</span>
+          {% else %}<span class="rounded bg-slate-200 text-slate-600 px-2 py-0.5">未识别</span>{% endif %}
+          <span class="text-slate-500 ml-1">{{ column.confidence|floatformat:2 }}</span>
+          <div class="text-slate-500 mt-1">{{ column.reason }}</div>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endwith %}
+  {% endfor %}
+  <button type="submit" class="mt-4 rounded bg-blue-700 px-5 py-2 text-white hover:bg-blue-800">确认列映射</button>
+</form>
+{% endblock %}

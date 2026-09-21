@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}资料归档 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-1">资料归档</h1>
+<p class="text-sm text-slate-500 mb-4">上传供应商的报价单或目录。原件原样存档、永不覆盖；之后每一条提取出来的信息都能追回到原件的单元格。</p>
+
+<form method="post" enctype="multipart/form-data" class="rounded-lg border border-slate-200 bg-white p-5 space-y-4 max-w-xl mb-8">
+  {% csrf_token %}
+  {% for error in form.non_field_errors %}<p class="text-sm text-red-700">{{ error }}</p>{% endfor %}
+  {% for field in form %}
+  <div>
+    <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-slate-700 mb-1">{{ field.label }}</label>
+    {{ field }}
+    {% if field.help_text %}<p class="text-xs text-slate-500 mt-1">{{ field.help_text }}</p>{% endif %}
+    {% for error in field.errors %}<p class="text-sm text-red-700 mt-1">{{ error }}</p>{% endfor %}
+  </div>
+  {% endfor %}
+  <button type="submit" class="rounded bg-blue-700 px-5 py-2 text-white hover:bg-blue-800">上传并识别表头</button>
+</form>
+
+<h2 class="font-semibold mb-2">已存档的资料</h2>
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3">#</th><th class="py-2 px-3">文件</th><th class="py-2 px-3">供应商</th><th class="py-2 px-3">状态</th><th class="py-2 px-3 hidden sm:table-cell">上传</th></tr></thead>
+  <tbody>
+  {% for f in files %}
+    <tr class="border-t border-slate-100">
+      <td class="py-1 px-3">{{ f.pk }}</td>
+      <td class="py-1 px-3 break-all"><a href="{% url 'sources:detail' f.pk %}" class="text-blue-700 hover:underline">{{ f.original_name }}</a> <span class="text-xs text-slate-400">{{ f.get_file_format_display }}</span></td>
+      <td class="py-1 px-3">{{ f.supplier }}</td>
+      <td class="py-1 px-3 {% if f.status == 'failed' %}text-red-700{% endif %}">{{ f.get_status_display }}</td>
+      <td class="py-1 px-3 hidden sm:table-cell text-slate-500">{{ f.uploaded_by|default:"" }} {{ f.created_at|date:"m-d H:i" }}</td>
+    </tr>
+  {% empty %}
+    <tr><td colspan="5" class="py-6 text-center text-slate-400">还没有资料。</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

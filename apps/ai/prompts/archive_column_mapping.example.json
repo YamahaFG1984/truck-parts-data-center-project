@@ -1,0 +1,8 @@
+{
+  "_note": "Mock output for archive_column_mapping. Covers the unusual headers used in apps/sources tests.",
+  "mapping": [
+    {"header": "Vendor Item", "field": "supplier_sku", "confidence": 0.8, "reason": "供应商自己的货号"},
+    {"header": "Cab Style", "field": "spec", "confidence": 0.6, "reason": "驾驶室类型，属于适配相关规格"},
+    {"header": "Warehouse", "field": "ignore", "confidence": 0.9, "reason": "仓库位置，与产品资料无关"}
+  ]
+}

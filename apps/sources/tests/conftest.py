@@ -1,3 +1,4 @@
+import functools
 import io
 
 import pytest
@@ -14,6 +15,7 @@ def _media_in_tmp(settings, tmp_path):
     settings.MEDIA_ROOT = tmp_path / "media"
 
 
+@functools.cache  # openpyxl stamps the save time into the file: re-saving is not "the same file"
 def xlsx_bytes(value="Front Grille") -> bytes:
     workbook = Workbook()
     workbook.active["A1"] = value
