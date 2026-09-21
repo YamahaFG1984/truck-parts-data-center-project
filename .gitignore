@@ -1,5 +1,7 @@
 # Python
 __pycache__/
+# uv run 会生成一个空壳锁文件：依赖在 requirements/*.txt，不在 pyproject 里
+uv.lock
 *.py[cod]
 .venv/
 .pytest_cache/
