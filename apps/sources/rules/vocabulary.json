@@ -1,0 +1,43 @@
+{
+  "_comment": "Maintained by data ops. part_types: canonical name -> aliases matched longest-first against product names; sided=true means the part needs a Left/Right position. name_positions are read from product names; column_positions only from a position column (words like Front are often part of a type name). Change, review, then run archive_rematch.",
+  "version": "2026-09-22",
+  "part_types": {
+    "Front Grille": {"aliases": ["front grille", "front grill", "radiator grille"], "sided": false},
+    "Side Grille": {"aliases": ["side grille", "side grill"], "sided": true},
+    "Bug Screen": {"aliases": ["bug screen", "bug deflector", "insect screen", "bug shield"], "sided": false},
+    "Fan Shroud": {"aliases": ["fan shroud", "radiator fan shroud"], "sided": false},
+    "Air Filter Housing": {"aliases": ["air filter housing", "air cleaner housing"], "sided": false},
+    "Air Filter Housing Cap": {"aliases": ["air filter housing cap", "air cleaner housing cap", "air filter cap", "air cleaner cap"], "sided": false},
+    "Headlamp": {"aliases": ["headlamp", "headlight", "head lamp", "head light", "headlamp assembly"], "sided": true},
+    "Mirror": {"aliases": ["mirror", "door mirror", "side mirror", "mirror assembly"], "sided": true},
+    "Fender": {"aliases": ["fender", "hood fender"], "sided": true},
+    "Bumper": {"aliases": ["bumper", "front bumper"], "sided": false},
+    "Hood": {"aliases": ["hood", "hood assembly"], "sided": false},
+    "Step": {"aliases": ["step", "entry step", "cab step"], "sided": true},
+    "Door Handle": {"aliases": ["door handle", "outside door handle"], "sided": true}
+  },
+  "name_positions": {
+    "Left": ["left", "lh", "l/h", "left hand", "left side", "driver", "driver side"],
+    "Right": ["right", "rh", "r/h", "right hand", "right side", "passenger", "passenger side"],
+    "Pair": ["pair", "l&r", "lh&rh", "left and right", "set of 2"]
+  },
+  "column_positions": {
+    "Left": ["l"], "Right": ["r"],
+    "Front": ["front", "fr"], "Rear": ["rear", "back"],
+    "Upper": ["upper", "top"], "Lower": ["lower", "bottom"],
+    "Center": ["center", "centre", "middle"]
+  },
+  "makes": {
+    "Freightliner": ["freightliner", "ftl"],
+    "Volvo": ["volvo", "volvo trucks"],
+    "Kenworth": ["kenworth", "kw"],
+    "Peterbilt": ["peterbilt", "pete"],
+    "International": ["international", "navistar", "ihc"],
+    "Mack": ["mack", "mack trucks"],
+    "Western Star": ["western star"],
+    "Sterling": ["sterling"],
+    "Hino": ["hino"],
+    "Isuzu": ["isuzu"]
+  },
+  "dim_units_to_cm": {"cm": 1, "mm": 0.1, "m": 100, "in": 2.54, "inch": 2.54, "inches": 2.54, "\"": 2.54}
+}

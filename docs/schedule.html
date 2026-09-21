@@ -589,7 +589,7 @@ git commit -am "feat(core): home dashboard, README, demo script (M20)" &amp;&amp
 <tr><td>M28</td><td>档案查询、产品页、三份导出、命令行</td><td><span class="tag codex">Sonnet</span></td><td>8h</td><td>M27</td></tr>
 <tr><td>M29</td><td>交付文档、结果样例、陌生资料演练</td><td><span class="tag codex">Sonnet</span></td><td>4–8h</td><td>全部</td></tr>
 </table></div>
-<p>测试用的合成数据集（<code>apps/archive/tests/fixtures.py</code>，在 M24 建立）必须覆盖以下陷阱，每一类都有断言：共享 OE 但品类不同、共享 OE 但左右不同（含同一文件内）、同适配下尺寸相同但品类不同、名称写法不同实为同件、名称互为子串的不同品类（Housing 与 Housing Cap）、无 OE 仅名称 + 适配 + 尺寸一致、同一供应商内重复、缺价格 / 币种 / MOQ / 适配 / 尺寸、适配缺年份、多币种、单元格格式与币种列矛盾、短编号相似。</p>
+<p>测试用的合成数据集（<code>apps/sources/tests/dataset.py</code>，在 M24 建立；archive 在 M25 才有，所以放在 sources）必须覆盖以下陷阱，每一类都有断言：共享 OE 但品类不同、共享 OE 但左右不同（含同一文件内）、同适配下尺寸相同但品类不同、名称写法不同实为同件、名称互为子串的不同品类（Housing 与 Housing Cap）、无 OE 仅名称 + 适配 + 尺寸一致、同一供应商内重复、缺价格 / 币种 / MOQ / 适配 / 尺寸、适配缺年份、多币种、单元格格式与币种列矛盾、短编号相似。</p>
 
 <div class="ms" id="m21"><div class="head"><h3>M21 · sources 数据模型与原件留存</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 300 行</span></div><div class="body">
 <h4>目标</h4><p>建立资料层：原件只读留存，来源记录写入后不可修改。</p>
@@ -654,7 +654,7 @@ git commit -m "feat(sources): PDF table extraction with page locators (M23)" &am
 <li><code>services/standardize.py</code>：品类与位置（最长匹配，先剥离位置词；位置列优先，与名称矛盾时警告）、适配（品牌 / 车型 / 年份，缺年份时标"不完整"）、尺寸（L×W×H 与单位换算到 cm）、价格（取数值；单元格格式与币种列矛盾时警告；<b>有价无币种不默认 USD</b>）、MOQ、报价日期；输出 fields、类型化字段、missing</li>
 <li><code>services/ingest.py</code>：<code>preview(source_file)</code>、<code>commit(source_file, user)</code>（一个事务；record_key 取源记录 ID → 料号 → 内容哈希）</li>
 <li>预检页：逐行结果、警告、缺失；"入库"按钮</li>
-<li><code>apps/archive/tests/fixtures.py</code>：合成两家供应商的数据集，覆盖上面列出的全部陷阱</li>
+<li><code>apps/sources/tests/dataset.py</code>：合成两家供应商的数据集，覆盖上面列出的全部陷阱</li>
 <li>测试：参数化覆盖各种写法；每个字段都有出处；事务回滚</li>
 </ul>
 <h4>验收</h4>

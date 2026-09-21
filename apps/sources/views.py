@@ -7,7 +7,7 @@ from django.views.generic import DetailView, FormView
 
 from .forms import UploadForm
 from .models import SourceFile
-from .services import intake
+from .services import ingest, intake
 from .services.mapping import FIELDS
 from .services.readers import ReadError
 from .services.storage import DuplicateFile, UploadRejected, store_upload
@@ -77,6 +77,9 @@ class MappingView(View):
         })
 
     def post(self, request, pk):
+        if self.source.status == SourceFile.Status.COMMITTED:
+            messages.error(request, "这份资料已经入库，映射不能再改；如有错误请修正后重新上传。")
+            return redirect("sources:detail", pk=pk)
         intake.suggestions(self.source, self.sheets)  # make sure suggestions exist
         chosen = {}
         for key, value in request.POST.items():
@@ -89,4 +92,36 @@ class MappingView(View):
         for warning in warnings:
             messages.warning(request, warning)
         messages.success(request, "列映射已确认，并保存为该供应商的模板。")
-        return redirect(reverse("sources:detail", args=[pk]))
+        return redirect(reverse("sources:preview", args=[pk]))
+
+
+class PreviewView(View):
+    """Every row as it would be stored, with warnings and missing fields; POST commits."""
+
+    template_name = "sources/preview.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        self.source = get_object_or_404(SourceFile.objects.select_related("supplier"),
+                                        pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, pk):
+        try:
+            planned = ingest.preview(self.source)
+        except (ingest.IngestError, ReadError) as exc:
+            messages.error(request, str(exc))
+            return redirect("sources:detail", pk=pk)
+        return render(request, self.template_name, {
+            "source": self.source, "planned": planned,
+            "counts": self.source.stats["preview"],
+        })
+
+    def post(self, request, pk):
+        try:
+            count = ingest.commit(self.source, request.user)
+        except (ingest.IngestError, ReadError) as exc:
+            messages.error(request, str(exc))
+            return redirect("sources:preview" if self.source.mapping.get("confirmed")
+                            else "sources:detail", pk=pk)
+        messages.success(request, f"已入库 {count} 条来源记录。")
+        return redirect("sources:detail", pk=pk)

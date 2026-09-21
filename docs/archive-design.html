@@ -282,17 +282,16 @@
 <!-- /fig:r6 -->
 <!-- fig:r6 -->
 
-<pre><code># SourceRecord.fields 中的一项
+<pre><code># SourceRecord.fields 中的两项（sources 是列表：OE 号、规格等可以来自多列）
 "dims": {
-  "value": [122, 75, 7], "unit": "cm",
-  "raw": "122 x 75 x 7 cm",
-  "column": "Package Size", "cell": "G2", "sheet": "Sheet1",
-  "rule": "dims_lxwxh", "warnings": []
+  "value": ["122.00", "75.00", "7.00"],
+  "rule": "dims_lxwxh_cm_to_cm", "warnings": [],
+  "sources": [{"column": "Package Size", "cell": "G2", "raw": "122 x 75 x 7 cm"}]
 }
 "price": {
-  "value": "51.01", "raw": "51.01",
-  "column": "Unit Price", "cell": "H4",
-  "rule": "decimal", "warnings": ["单元格格式为 $，与币种列 EUR 不一致，以币种列为准"]
+  "value": "51.01", "rule": "number",
+  "warnings": ["单元格格式显示 $，与币种 EUR 不一致，以币种为准"],
+  "sources": [{"column": "Unit Price", "cell": "H4", "raw": "51.01"}]
 }</code></pre>
 <ul>
 <li>产品页上每个值都可以点开，看到它来自哪个供应商、哪个文件、哪个工作表的哪个单元格（PDF 则是哪一页、哪张表、哪一行），原文是什么，按哪条规则解析，有没有警告。</li>
@@ -578,7 +577,7 @@
 </ul>
 
 <h2 id="s14">14. 施工计划 M21–M29</h2>
-<p>每个里程碑一次提交、一次审核，文件清单、验收命令与审核清单见 <a href="schedule.html#phase2">施工进度表 · 第二阶段</a>。测试用合成数据复现与样例资料相同的陷阱模式（共享 OE 但品类不同、左右不同、尺寸相同品类不同、写法不同实为同件、无编号、缺字段、多币种、单元格格式与币种矛盾），不引用公司资料。</p>
+<p>每个里程碑一次提交、一次审核，文件清单、验收命令与审核清单见 <a href="schedule.html#phase2">施工进度表 · 第二阶段</a>。测试用合成数据（<code>apps/sources/tests/dataset.py</code>）复现与样例资料相同的陷阱模式（共享 OE 但品类不同、左右不同、尺寸相同品类不同、写法不同实为同件、无编号、缺字段、多币种、单元格格式与币种矛盾），不引用公司资料。</p>
 <div class="tbl narrow"><table>
 <tr><th>#</th><th>里程碑</th><th>工时</th></tr>
 <tr><td>M21</td><td>sources 数据模型与原件留存</td><td>0.5 天</td></tr>

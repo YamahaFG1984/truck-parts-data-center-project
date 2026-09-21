@@ -64,14 +64,14 @@ def test_confirming_saves_the_mapping_and_a_template(ops, supplier):
     url = reverse("sources:mapping", args=[source.pk])
     ops.get(url)
 
-    response = ops.post(url, {"field__0__4": "note"}, follow=True)
+    response = ops.post(url, {"field__0__4": "note"})
 
     source.refresh_from_db()
     assert source.status == "mapped" and source.mapping["confirmed"]
     position = source.mapping["sheets"][0]["columns"][4]
     assert (position["field"], position["source"]) == ("note", "manual")
     assert MappingTemplate.objects.filter(supplier=supplier).exists()
-    assert "列映射已确认" in response.content.decode()
+    assert response.url == reverse("sources:preview", args=[source.pk])  # next step
 
 
 def test_an_invalid_mapping_is_not_confirmed(ops, supplier):

@@ -32,9 +32,13 @@
       {% endfor %}
       </ul>
       <p class="mt-3">
-        {% if source.mapping.confirmed %}
+        {% if source.status == "committed" %}
+          <span class="text-emerald-700">✓ 已入库 {{ source.stats.committed.rows }} 条来源记录</span>
+          <span class="text-slate-500 ml-2">其中 {{ source.stats.committed.with_warnings }} 条有警告、{{ source.stats.committed.with_missing }} 条缺关键字段</span>
+        {% elif source.mapping.confirmed %}
           <span class="text-emerald-700">✓ 列映射已确认</span>
           <a href="{% url 'sources:mapping' source.pk %}" class="ml-2 text-blue-700 hover:underline">查看或修改</a>
+          <a href="{% url 'sources:preview' source.pk %}" class="ml-3 rounded bg-blue-700 px-4 py-1.5 text-white hover:bg-blue-800">预检 →</a>
         {% else %}
           <a href="{% url 'sources:mapping' source.pk %}" class="rounded bg-blue-700 px-4 py-1.5 text-white hover:bg-blue-800">确认列映射 →</a>
         {% endif %}
