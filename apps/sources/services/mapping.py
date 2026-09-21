@@ -9,6 +9,7 @@ import hashlib
 import re
 import unicodedata
 
+from django.utils import timezone
 from pydantic import BaseModel, Field, field_validator
 
 from ..models import MappingTemplate
@@ -117,7 +118,7 @@ def suggest(headers: list[str], sample_rows: list[dict], supplier, *, client=Non
     ).first()
     if template:
         by_header = {c["header"]: c["field"] for c in template.columns}
-        reason = f"沿用 {template.updated_at:%Y-%m-%d} 人工确认的映射"
+        reason = f"沿用 {timezone.localtime(template.updated_at):%Y-%m-%d} 人工确认的映射"
         return [_item(h, by_header.get(h, "ignore"), "template", 1.0, reason) for h in headers]
 
     found, unknown = {}, []

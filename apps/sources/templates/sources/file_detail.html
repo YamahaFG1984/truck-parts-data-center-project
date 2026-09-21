@@ -25,7 +25,8 @@
     {% else %}
       <ul class="space-y-2">
       {% for sheet in source.stats.sheets %}
-        <li>工作表 <b>{{ sheet.name }}</b>：表头在第 {{ sheet.header_row }} 行，{{ sheet.rows }} 行数据
+        <li>{% if source.file_format != 'pdf' %}工作表 {% endif %}<b>{{ sheet.name }}</b>：表头在第 {{ sheet.header_row }} 行，{{ sheet.rows }} 行数据
+          {% if sheet.notes %}<ul class="mt-1 ml-4 list-disc text-amber-800">{% for n in sheet.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
           {% if sheet.skipped %}<ul class="mt-1 ml-4 list-disc text-slate-500">{% for s in sheet.skipped %}<li>第 {{ s.row }} 行已跳过：{{ s.reason }}</li>{% endfor %}</ul>{% endif %}
         </li>
       {% endfor %}

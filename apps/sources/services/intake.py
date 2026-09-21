@@ -18,7 +18,7 @@ def inspect(source_file: SourceFile) -> list[Sheet]:
         raise
     source_file.stats = source_file.stats | {"sheets": [
         {"name": s.name, "header_row": s.header_row, "rows": len(s.rows),
-         "skipped": [{"row": r, "reason": why} for r, why in s.skipped]}
+         "skipped": [{"row": r, "reason": why} for r, why in s.skipped], "notes": s.notes}
         for s in sheets
     ]}
     source_file.save(update_fields=["stats", "updated_at"])
@@ -39,8 +39,9 @@ def suggestions(source_file: SourceFile, sheets: list[Sheet], *, client=None) ->
         source_file.mapping = {"sheets": cached, "confirmed": False}
         source_file.save(update_fields=["mapping", "updated_at"])
     samples = {s.name: s.rows[:mapping.SAMPLE_ROWS] for s in sheets}
+    notes = {s.name: s.notes for s in sheets}
     return [
-        sheet | {"columns": [
+        sheet | {"notes": notes.get(sheet["name"], []), "columns": [
             column | {"samples": [r.cells[column["header"]].text
                                   for r in samples.get(sheet["name"], [])
                                   if column["header"] in r.cells]}
