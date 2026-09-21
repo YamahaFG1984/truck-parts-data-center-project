@@ -6,6 +6,7 @@
   <title>{% block title %}卡车配件 AI 产品数据中心{% endblock %}</title>
   {# Tailwind play CDN is fine for a demo; not for production builds. #}
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>[x-cloak]{display:none !important}</style>
   <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
   <script src="{% static 'vendor/alpine.min.js' %}" defer></script>
   {% block extra_head %}{% endblock %}

@@ -164,6 +164,16 @@ def test_detail_page_marks_demo_mode_and_pending_candidates(admin_client, chambe
     assert chamber.sku in body and "26570367" in body
 
 
+def test_upload_page_offers_drop_and_paste_but_keeps_a_plain_file_input(admin_client):
+    body = admin_client.get(reverse("inquiries:image")).content.decode()
+
+    assert "粘贴截图" in body and "拖到这里" in body
+    assert 'x-data="photoPicker()"' in body
+    assert f'data-max-mb="{image_inquiry.MAX_UPLOAD_MB}"' in body
+    # Without JavaScript the form must still post a file the ordinary way.
+    assert 'type="file" name="photo"' in body and "enctype=\"multipart/form-data\"" in body
+
+
 def test_non_image_upload_shows_error_and_creates_nothing(admin_client):
     response = admin_client.post(
         reverse("inquiries:image"),

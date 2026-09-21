@@ -19,6 +19,7 @@ from .forms import PhotoForm, QuoteForm
 from .models import Inquiry
 from .services.export import PLATFORMS, eligible, filename
 from .services.image_inquiry import (
+    MAX_UPLOAD_MB,
     ImageRejected,
     confirm,
     create_image_inquiry,
@@ -57,7 +58,10 @@ class ImageInquiryView(FormView):
         return redirect("inquiries:detail", pk=inquiry.pk)
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(**kwargs) | {"mock": settings.LLM_PROVIDER == "mock"}
+        return super().get_context_data(**kwargs) | {
+            "mock": settings.LLM_PROVIDER == "mock",
+            "max_upload_mb": MAX_UPLOAD_MB,  # the picker rejects oversize files before uploading
+        }
 
 
 class InquiryDetailView(DetailView):
