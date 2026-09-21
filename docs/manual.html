@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>使用说明 · 卡车配件 AI 产品数据中心</title>
+<meta name="description" content="卡车配件 AI 产品数据中心的操作手册：智能查询、图片询价、报价单、数据质量看板、供应商导入、AI 补全审核、询价记录与平台导出的逐页说明。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a class="active" href="manual.html">使用说明</a>
+    <a href="prd.html">PRD</a>
+    <a href="architecture.html">架构设计</a>
+    <a href="data-dictionary.html">数据字典</a>
+    <a href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>使用说明</h1>
+<p class="lede">面向实际使用系统的人：销售、采购、产品数据运营。按页面组织，每一节说明这个页面做什么、怎么操作、数字是怎么算出来的、什么时候需要人工判断。</p>
+<p class="meta">版本 v1.0 · 2026-09-21 · 对应里程碑 M20</p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#s1">系统是做什么的</a></li>
+<li><a href="#s2">登录与界面约定</a></li>
+<li><a href="#s3">首页</a></li>
+<li><a href="#s4">智能查询</a></li>
+<li><a href="#s5">产品详情页</a></li>
+<li><a href="#s6">图片询价</a></li>
+<li><a href="#s7">报价单</a></li>
+<li><a href="#s8">数据质量看板</a></li>
+<li><a href="#s9">产品列表与批量操作</a></li>
+<li><a href="#s10">导入供应商报价单</a></li>
+<li><a href="#s11">AI 补全与审核台</a></li>
+<li><a href="#s12">询价记录</a></li>
+<li><a href="#s13">平台上架导出</a></li>
+<li><a href="#s14">后台任务与后台管理</a></li>
+<li><a href="#s15">数据规范速查</a></li>
+<li><a href="#s16">常见问题</a></li>
+</ol></div>
+
+<h2 id="s1">1. 系统是做什么的</h2>
+<p>一句话：把散在供应商 Excel、PDF 和微信里的配件数据，收进一个标准、可追溯的产品库，让销售用<b>一个编号、一句话或一张照片</b>在几秒内回答客户的"这是什么件、能不能配、多少钱"。</p>
+<div class="tbl narrow"><table>
+<tr><th>角色</th><th>每天主要用哪几页</th></tr>
+<tr><td>销售</td><td><a href="#s4">智能查询</a> → <a href="#s5">产品详情</a> → <a href="#s7">报价单</a>；客户发照片时走 <a href="#s6">图片询价</a></td></tr>
+<tr><td>采购</td><td><a href="#s10">导入供应商报价单</a>，在产品详情页比较几家的成本与交期</td></tr>
+<tr><td>产品数据运营</td><td><a href="#s8">数据质量看板</a> → <a href="#s9">产品列表</a>筛出缺什么 → <a href="#s11">AI 补全与审核台</a> → <a href="#s13">平台导出</a></td></tr>
+<tr><td>管理者</td><td>首页四个数字、<a href="#s12">询价记录</a>里的"未命中最多的输入"</td></tr>
+</table></div>
+<div class="note"><b>一条贯穿全系统的原则。</b>AI 只做<b>提取、映射、文案、读图</b>四件事，<b>匹配永远基于自家数据库</b>。AI 产出的内容一律先进"待审核"，由人勾选后才写入产品；系统里没有第二条让 AI 写进业务字段的路径。</div>
+
+<h2 id="s2">2. 登录与界面约定</h2>
+<ul>
+<li><b>登录。</b>所有页面都需要登录，未登录会跳到登录页。演示环境的账号见 <code>README.md</code>（默认 <code>demo</code>）。</li>
+<li><b>导航栏。</b>首页、搜索、导入、看板、审核、询价；管理员多一个"后台"。</li>
+<li><b>语言与字段。</b>界面中文，<b>数据字段保持英文</b>（品名、描述、关键词面向海外平台），金额统一 <b>USD</b>，不做多币种与汇率。</li>
+<li><b>演示模式横幅。</b>页面上出现黄色的"演示模式"提示，说明当前没有接大模型接口，AI 的三处输出（列映射、文案补全、图片识别）返回固定示例；匹配、评分、报价、导出仍是真实计算。横幅消失就表示已接入真实模型。</li>
+<li><b>页脚声明。</b>演示数据均为合成，编号按各品牌书写格式随机生成，<b>不是真实 OE 号</b>，不能用于采购或报价。</li>
+</ul>
+
+<h2 id="s3">3. 首页</h2>
+<p>一屏四件事：搜索框、四个数字、最该补的数据、最近询价。</p>
+<div class="tbl narrow"><table>
+<tr><th>数字</th><th>含义</th><th>点开去哪</th></tr>
+<tr><td>SKU 总数</td><td>产品库里的料号数量</td><td>产品列表</td></tr>
+<tr><td>平均完整度</td><td>所有 SKU 完整度得分的平均值，满分 100</td><td>数据质量看板</td></tr>
+<tr><td>待审核的 AI 建议</td><td>等人处理的 AI 补全结果条数</td><td>AI 审核台</td></tr>
+<tr><td>疑似重复</td><td>同一个 OE 号或互换号挂在多个 SKU 上的组数</td><td>看板的疑似重复表</td></tr>
+</table></div>
+<p>"最该补的数据"是缺失项里数量最多的四项，点任意一条直接跳到对应的产品列表；"最近询价"是最近六条真实询价（边打字产生的半截搜索不计入，规则见 <a href="#s12">第 12 节</a>）。</p>
+
+<h2 id="s4">4. 智能查询</h2>
+<p>最常用的页面。客户给什么就往框里输什么，边输边出结果（停止输入约 0.3 秒后自动查询）。</p>
+
+<h3>4.1 能认出哪些输入</h3>
+<div class="tbl narrow"><table>
+<tr><th>输入形态</th><th>例子</th><th>说明</th></tr>
+<tr><td>OE 号</td><td><code>4020269</code></td><td>主机厂原厂号，客户最常给的</td></tr>
+<tr><td>带分隔符</td><td><code>4020-269</code>、<code>4020 269</code>、<code>A 000 420 15 20</code></td><td>横杠、空格、点号都会被去掉后再比对</td></tr>
+<tr><td>全角字符</td><td><code>４０２０２６９</code></td><td>从网页或聊天复制常见，会被转成半角</td></tr>
+<tr><td>大小写混用</td><td><code>az3238069240</code></td><td>统一按大写比对</td></tr>
+<tr><td>残缺编号</td><td><code>402026</code>、<code>265703?7</code></td><td>走前缀与模糊匹配，给候选而不是空白</td></tr>
+<tr><td>互换号</td><td>竞品或配套厂编号</td><td>与 OE 号同样检索</td></tr>
+<tr><td>我方 SKU</td><td><code>FIT-FFL-00027</code></td><td>内部料号</td></tr>
+<tr><td>英文品名 / 车型</td><td><code>brake chamber volvo</code></td><td>按名称与适配车型检索</td></tr>
+<tr><td>中文名</td><td><code>刹车片</code></td><td>同上</td></tr>
+</table></div>
+<p>想限定查哪一类，加前缀：<code>oe:20443906</code>、<code>sku:FIT-BPD-00001</code>、<code>name:brake pad</code>。</p>
+
+<h3>4.2 结果上的匹配标签</h3>
+<p>每条结果左上角的标签说明"为什么命中它"，可信度由高到低：</p>
+<div class="tbl narrow"><table>
+<tr><th>标签</th><th>含义</th><th>要不要人工确认</th></tr>
+<tr><td><span class="tag" style="background:var(--ok-soft);color:var(--ok);border-color:transparent">精确</span></td><td>输入与库里的编号一字不差</td><td>不用</td></tr>
+<tr><td><span class="tag" style="background:var(--accent-soft);color:var(--accent);border-color:transparent">归一化</span></td><td>去掉横杠空格、转半角大写后一致</td><td>不用</td></tr>
+<tr><td><span class="tag" style="background:var(--warn-soft);color:var(--warn);border-color:transparent">前缀 / 包含</span></td><td>输入是库里编号的一部分，或反过来</td><td>建议核对</td></tr>
+<tr><td><span class="tag" style="background:var(--warn-soft);color:var(--warn);border-color:transparent">模糊</span></td><td>相似度匹配，标签后会显示 0–1 的相似度</td><td>必须核对</td></tr>
+<tr><td><span class="tag">名称</span></td><td>按品名或车型找到的，不是按编号</td><td>必须核对</td></tr>
+</table></div>
+<p>一个编号命中多个 SKU 是正常的——它们互为<b>替代件</b>，也可能是需要合并的重复录入，看板里能看到全部这类情况。</p>
+
+<h3>4.3 结果卡片怎么读</h3>
+<ul>
+<li><b>完整度徽标</b>（右上角）：绿 ≥ 70、黄 40–69、红 &lt; 40。分数低说明这个 SKU 资料不全，报给客户前要留意。</li>
+<li><b>OE 号 / 互换号</b>：各最多显示 4 条，后面标"等 N 个"；缺 OE 号会用红色"缺"提示。</li>
+<li><b>成本 / 售价</b>：<code>$最低成本 → $建议售价</code>，后面是 MOQ、交期、几家报价。成本只对有查看权限的人显示。</li>
+</ul>
+<p>每一次查询都会自动记一条询价，结果区上方会显示"已记为询价 #N，生成报价单"，可以直接跳去开报价。</p>
+
+<h2 id="s5">5. 产品详情页</h2>
+<p>一个页面回答客户的全部问题：</p>
+<ul>
+<li><b>编号</b>：OE 号、互换号、供应商料号，各自标着品牌与来源。</li>
+<li><b>规格</b>：按该分类定义的字段显示并带单位；该分类要求必填、但这个产品没有的，会显示红色"缺"。</li>
+<li><b>适配车型</b>：品牌 / 车系 / 发动机 / 年份区间。</li>
+<li><b>供应商报价</b>：各家成本、MOQ、交期、报价日期，最便宜的在最前。</li>
+<li><b>替代件</b>：与本产品共用同一个 OE 号或互换号的其它 SKU。</li>
+<li><b>AI 补全</b>按钮：见 <a href="#s11">第 11 节</a>。</li>
+<li>管理员还能看到"在后台编辑"的入口。</li>
+</ul>
+
+<h2 id="s6">6. 图片询价</h2>
+<p>客户只发了一张照片、说不出编号时用。入口在搜索页的"没有编号？用照片查询"。</p>
+<ol>
+<li><b>上传照片。</b>支持 jpg、png、webp，单张不超过 10 MB。系统会自动缩到 1280 像素以内、重新编码，顺带<b>去掉照片里的 EXIF 信息</b>（手机照片常带 GPS）。存进系统的和发给模型的都是处理后的版本。</li>
+<li><b>模型读图。</b>返回四项：零件类型、图上可见的编号、品牌线索、外观描述，以及一个 0–1 的置信度。<b>模型只负责"读"，不负责判断是哪个 SKU。</b></li>
+<li><b>系统检索。</b>读到的编号回到产品库里走和搜索框完全相同的匹配；读不出编号时按零件类型 + 品牌线索按名称检索。</li>
+<li><b>人工确认。</b>候选列表只是建议，<b>点"确认是这个产品"之前，询价记录里不会写入任何产品</b>。确认后可直接"生成报价单"。</li>
+</ol>
+<div class="note warn"><b>识别失败怎么办。</b>页面会显示"识别失败"和原因，并给一个"重新识别"按钮，可重试；仍然不行就让客户补拍铭牌，或改用编号查询。</div>
+
+<h2 id="s7">7. 报价单</h2>
+<p>从搜索结果、询价详情或询价记录进入。</p>
+<ul>
+<li><b>填两个数</b>：数量、目标毛利率（默认 25.00%）。客户名可选，会记在询价上。</li>
+<li><b>价格怎么算</b>：<code>单价 = 最低成本 × (1 + 毛利率)</code>，四舍五入到分；<code>金额 = 单价 × 数量</code>。全程用十进制小数计算，不会有浮点误差。</li>
+<li><b>低于起订量</b>：数量小于 MOQ 时不会阻止你，但会在备注里标出来。</li>
+<li><b>快照</b>：加入报价单的那一刻，成本、毛利率、单价就被固定下来。以后供应商调价或改了默认毛利率，<b>已经发出去的报价不会变</b>。</li>
+<li><b>没有供应商报价的产品无法报价</b>，页面会直接告诉你缺什么。</li>
+</ul>
+<h3>下载的 Excel 有两张表</h3>
+<div class="tbl narrow"><table>
+<tr><th>工作表</th><th>内容</th><th>能不能发客户</th></tr>
+<tr><td>Quotation</td><td>序号、图片、SKU、品名、OE / 互换号、规格、包装、数量、单价、金额、MOQ、交期、替代件、备注</td><td><b>可以</b>，这是给客户的那张</td></tr>
+<tr><td>Internal</td><td>SKU、供应商、供应商料号、单位成本、毛利率、售价、报价日期</td><td><b>不可以</b>，只在有成本查看权限时生成</td></tr>
+</table></div>
+<div class="note bad"><b>发送前务必确认。</b>发给客户之前删掉 Internal 表，或在"无成本权限"的账号下导出。</div>
+
+<h2 id="s8">8. 数据质量看板</h2>
+<p>回答"我们的数据到底缺什么、先补哪个"。每个数字都能点开，看到背后是哪些 SKU——看板上的数和点进去的列表永远一致。</p>
+<h3>8.1 完整度是怎么算的</h3>
+<p>每个 SKU 一个 0–100 的分数，各项有无即得分：</p>
+<div class="tbl narrow"><table>
+<tr><th>项目</th><th>分值</th><th>判定标准</th></tr>
+<tr><td>OE 号</td><td>20</td><td>至少一条 kind=OE 的编号</td></tr>
+<tr><td>主图</td><td>15</td><td>有一张标为主图的图片</td></tr>
+<tr><td>英文品名</td><td>10</td><td>非空且至少 5 个字符</td></tr>
+<tr><td>分类</td><td>10</td><td>挂在某个叶子分类下</td></tr>
+<tr><td>互换号</td><td>10</td><td>至少一条 kind=CROSS 的编号</td></tr>
+<tr><td>适配车型</td><td>10</td><td>至少一条适配记录</td></tr>
+<tr><td>规格属性</td><td>10</td><td>该分类标为必填的属性全部有值</td></tr>
+<tr><td>供应商报价</td><td>10</td><td>至少一条报价</td></tr>
+<tr><td>包装信息</td><td>5</td><td>每箱数量与毛重都有</td></tr>
+</table></div>
+<p>分数在导入、保存产品、采纳 AI 建议之后自动重算；也可以由管理员运行 <code>manage.py recompute_quality</code> 全量重算。</p>
+<h3>8.2 三块内容</h3>
+<ul>
+<li><b>完整度分布</b>：0–39 / 40–69 / 70–89 / 90–100 四档，点一档看这一档的 SKU。</li>
+<li><b>缺失项</b>：按数量从多到少排，先补数量大的最划算。点一项直接得到待补清单。</li>
+<li><b>疑似重复</b>：同一个编号挂在多个 SKU 上。<b>需要人来判断</b>——可能是重复录入要合并，也可能是真正的替代件，系统不会自动合并。</li>
+</ul>
+
+<h2 id="s9">9. 产品列表与批量操作</h2>
+<p>看板的下钻页，也可以直接打开。默认按完整度从低到高排序，最需要补的排在最前。</p>
+<div class="tbl narrow"><table>
+<tr><th>筛选</th><th>写法</th></tr>
+<tr><td>按缺失项</td><td><code>?missing=oe</code>（可选 name、category、oe、cross、fitment、image、description、packaging、offer）</td></tr>
+<tr><td>按完整度区间</td><td><code>?score=40-69</code></td></tr>
+<tr><td>按状态</td><td><code>?status=draft</code> / <code>reviewed</code> / <code>published</code></td></tr>
+<tr><td>按分类</td><td><code>?category=&lt;分类 id&gt;</code></td></tr>
+</table></div>
+<p>勾选左侧复选框（表头的复选框可全选本页）后有两个动作：</p>
+<ul>
+<li><b>批量 AI 补全</b>：一次最多 50 个，任务在后台跑，页面会跳到进度条；结果全部进审核台，不直接写产品。</li>
+<li><b>上架导出</b>：选平台后导出 CSV，见 <a href="#s13">第 13 节</a>。</li>
+</ul>
+
+<h2 id="s10">10. 导入供应商报价单</h2>
+<p>把供应商发来的 Excel / CSV 变成库里的数据。五步，每一步都能退回上一步。</p>
+<ol>
+<li><b>上传</b>：选文件，选这份报价单属于哪家供应商（有供应商才会写入报价与供应商料号）。所有单元格按文本读取，编号不会丢前导 0、不会变成科学计数。</li>
+<li><b>预览</b>：系统自动找到真正的表头行（前面有公司抬头、空行都没关系），显示前 20 行。核对一下它找对了没有。</li>
+<li><b>列映射</b>：每一列对应哪个标准字段。来源标签的含义：
+  <div class="tbl narrow"><table>
+  <tr><th>标签</th><th>含义</th></tr>
+  <tr><td>同义词</td><td>命中内置的表头同义词表（如 "Part No." "OEM NO" "Ref"），置信度高</td></tr>
+  <tr><td>AI</td><td>同义词表认不出，交给大模型猜的</td></tr>
+  <tr><td>人工</td><td>你手动改过的</td></tr>
+  <tr><td>未识别</td><td>没认出来，默认"忽略此列"</td></tr>
+  </table></div>
+  <b>每一列都可以改</b>；确认无误再继续。不需要的列选"忽略此列"。</li>
+<li><b>预检</b>：把每一行会发生什么算出来给你看，<b>此时数据库还没有被写入任何内容</b>：
+  <div class="tbl narrow"><table>
+  <tr><th>结果</th><th>含义</th></tr>
+  <tr><td>新增</td><td>库里没有，将新建一个<b>草稿</b>产品（自动分配 SKU）</td></tr>
+  <tr><td>更新</td><td>按 SKU / OE 号 / 供应商料号对上了现有产品，补充空白字段与报价</td></tr>
+  <tr><td>跳过</td><td>信息与库里一致无需更新，或与本文件前面某一行是同一产品</td></tr>
+  <tr><td>疑似重复</td><td>编号同时挂在多个 SKU 上，<b>不导入</b>，请先在看板里处理</td></tr>
+  <tr><td>无效</td><td>既没有 SKU、也没有 OE 号和供应商料号，无法判断是哪个产品；或数值格式无法解析</td></tr>
+  </table></div></li>
+<li><b>执行导入</b>：一个事务写入，中途出错整批回滚，不会只进一半。结果页按类别列出每一行的明细。</li>
+</ol>
+<div class="note"><b>更新的规则。</b>只补空白；已有值不会被供应商文件悄悄覆盖。导入写入的数据来源标为 <code>import</code>，可在产品详情和后台看到。只有互换号、没有 OE 号的行会被判为无效——互换号说明不了它是我们的哪个产品。</div>
+
+<h2 id="s11">11. AI 补全与审核台</h2>
+<h3>11.1 发起补全</h3>
+<p>在产品详情页点"AI 补全"，或在产品列表勾选多个后"批量 AI 补全"。送给模型的只有这个产品的<b>公开信息</b>：品名、分类、编号、适配车型、已有属性。<b>成本、供应商、客户信息一律不进提示词。</b></p>
+<p>模型会生成：上架标题、英文描述、关键词、卖点、FAQ、分类建议、规格属性。</p>
+<h3>11.2 审核</h3>
+<ul>
+<li>每条建议按字段逐项列出：左边是<b>当前值</b>，右边是 <b>AI 建议</b>，前面有勾选框。</li>
+<li><b>会覆盖已有值的字段默认不勾选</b>，并标着"会覆盖当前值，确认无误再勾选"。</li>
+<li>点"采纳"只写入你勾选的字段；产品的来源标为 <code>ai</code>，备注里留痕，完整度立即重算。</li>
+<li>点"拒绝"可以填原因，建议进入"已拒绝"存档，不会再出现在待办里。</li>
+<li>顶部三个页签：待审核 / 已采纳 / 已拒绝，每条都能追溯到对应的模型调用记录（模型名、耗时、token）。</li>
+</ul>
+<div class="note ok"><b>为什么要这一步。</b>大模型不会"知道"OE 号，让它凭空回答编号一定会出错。它擅长的是把已有信息写成合格的英文文案、推断分类与规格。所以系统只让它做这些，并且一律要人点头。</div>
+
+<h2 id="s12">12. 询价记录</h2>
+<p>每一次搜索和每一次图片询价都会自动留痕，不需要手工记录。记录里有：原始输入、输入类型、是否命中、命中的产品、时间、操作人。</p>
+<ul>
+<li><b>半截输入默认隐藏。</b>边打字边搜索会产生很多中间状态（"2044"、"20443"、"204439"…）。同一个人在 60 秒内输入的、被后面更完整的输入接续掉的那些，默认不显示；点"显示全部"可以看到。</li>
+<li><b>筛选</b>：全部 / 文字 / 图片 / 未命中 / 已命中 / 近 7 天 / 近 30 天。</li>
+<li><b>未命中最多的输入</b>（右侧）：最近 30 天客户反复问、库里却没有的编号。<b>这是最有价值的一张表</b>——它直接告诉你下一批该补什么产品、该找哪些货源。</li>
+</ul>
+
+<h2 id="s13">13. 平台上架导出</h2>
+<p>在产品列表勾选 SKU → 右上"上架导出"选平台（Alibaba 或 Shopify）→ 导出 CSV。</p>
+<ul>
+<li><b>只导出已审核（已审核 / 已上架状态）且有主图的 SKU。</b>被挡下的会在页面顶部列出 SKU 和原因（未审核、缺主图）。平台页面是公开且长期存在的，半成品数据不该发上去。</li>
+<li><b>文件里没有成本、供应商名称和供应商料号</b>，价格列是建议售价。</li>
+<li>CSV 带 BOM（utf-8-sig），用 Excel 直接打开中文不乱码；描述里的换行和逗号已正确转义。</li>
+<li>列顺序按平台模板排：Alibaba 是产品名、SKU、分类、型号、OE / 互换号、适配车型、规格、关键词、描述、卖点、产地、单位、起订量、FOB 价、交期、包装、主图链接；Shopify 是标准的 Product CSV（Handle、Title、Body (HTML)、Vendor、Tags、Variant SKU、Variant Price…）。</li>
+</ul>
+<div class="note"><b>下载后的提示在哪。</b>因为浏览器收到的是一个文件，排除原因会在你下一次刷新或切换页面时以提示条出现，不是不显示。</div>
+
+<h2 id="s14">14. 后台任务与后台管理</h2>
+<p><b>后台任务</b>：批量 AI 补全这类耗时操作在后台进程里跑，页面显示实时进度（已完成 / 失败 / 总数），完成后给出结果链接。如果页面提示"后台任务未运行"，说明服务器上的 <code>qcluster</code> 进程没启动，请管理员启动它；单个产品的 AI 补全是同步的，不受影响。</p>
+<p><b>后台管理</b>（<code>/admin/</code>，仅管理员）：所有数据的增删改查兜底入口。可以按 SKU、编号、名称搜索产品，在产品页里直接编辑编号、适配车型、图片、报价；也能查看全部 AI 调用记录。任何前台功能出问题时，这里都能手工改数据。</p>
+
+<h2 id="s15">15. 数据规范速查</h2>
+<div class="tbl narrow"><table>
+<tr><th>产品状态</th><th>含义</th></tr>
+<tr><td>草稿 draft</td><td>新建或导入进来，尚未有人核对过</td></tr>
+<tr><td>已审核 reviewed</td><td>人工核对过，可以对外报价、可以导出上架</td></tr>
+<tr><td>已上架 published</td><td>已经发布到平台</td></tr>
+</table></div>
+<div class="tbl narrow"><table>
+<tr><th>数据来源</th><th>含义</th></tr>
+<tr><td>manual</td><td>人工录入</td></tr>
+<tr><td>import</td><td>从供应商文件导入</td></tr>
+<tr><td>ai</td><td>AI 生成并经人工采纳</td></tr>
+</table></div>
+<p>每条可被导入或 AI 影响的数据还带<b>置信度</b>（0–1）和<b>是否人工确认</b>两个标记，用来回答"这条数据是谁写的、有多可信"。</p>
+<div class="tbl narrow"><table>
+<tr><th>编号类型</th><th>含义</th></tr>
+<tr><td>OE</td><td>主机厂原厂号，判断"是哪个产品"的主依据</td></tr>
+<tr><td>CROSS</td><td>互换号：其他品牌或配套厂的对应编号</td></tr>
+<tr><td>SUPPLIER</td><td>供应商自己的料号</td></tr>
+</table></div>
+<p>同一个编号可以挂在多个产品上（互为替代件），但在同一个产品上不能重复。字段级的详细规范见<a href="data-dictionary.html">数据字典</a>。</p>
+
+<h2 id="s16">16. 常见问题</h2>
+<div class="tbl narrow"><table>
+<tr><th>现象</th><th>原因与处理</th></tr>
+<tr><td>输了编号搜不到</td><td>先确认不是分类问题：换成"名称 / 车型"搜一次。仍然没有就是库里确实没这个号——它会自动进"未命中"榜，可据此补数据。</td></tr>
+<tr><td>搜出来好几个 SKU</td><td>同一编号挂在多个产品上，它们互为替代件；如果看起来是同一个东西录了两遍，去看板的"疑似重复"处理。</td></tr>
+<tr><td>产品页显示"缺"</td><td>该分类要求这个规格但产品没有值。可以在后台补，或用 AI 补全生成建议后采纳。</td></tr>
+<tr><td>无法生成报价单</td><td>这个 SKU 还没有任何供应商报价，先让采购导入或在后台补一条。</td></tr>
+<tr><td>导出时 SKU 被排除</td><td>状态还是草稿，或没有主图。先审核、先补图。</td></tr>
+<tr><td>导入后数字没变</td><td>看预检结果：多半被判成了"跳过"（信息一致）或"疑似重复"（未导入）。</td></tr>
+<tr><td>Excel 打开导出的 CSV 乱码</td><td>系统导出的是带 BOM 的 UTF-8，正常不会乱码；如果是别人转存过的文件，导入时选 UTF-8 编码打开。</td></tr>
+<tr><td>页面提示"后台任务未运行"</td><td>服务器的 qcluster 进程没启动，找管理员；或改用单个产品的 AI 补全。</td></tr>
+<tr><td>AI 补全失败</td><td>页面会显示具体原因（密钥、余额、模型未开通、超时）。失败不会影响已有数据，可以重试。</td></tr>
+<tr><td>看到黄色"演示模式"横幅</td><td>当前未接大模型，AI 输出是固定示例。要接真实模型请管理员配置 <code>.env</code>。</td></tr>
+</table></div>
+
+<p class="meta">相关文档：<a href="index.html">总览</a> · <a href="DEMO_SCRIPT.md">5 分钟演示脚本</a> · <a href="data-dictionary.html">数据字典（字段规范）</a> · <a href="architecture.html">架构设计（实现细节）</a></p>
+</main>
+<footer class="site">使用说明 v1.0 · 演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>
