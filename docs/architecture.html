@@ -13,6 +13,7 @@
   <nav>
     <a href="index.html">总览</a>
     <a href="manual.html">使用说明</a>
+    <a href="search-design.html">智能搜索</a>
     <a href="prd.html">PRD</a>
     <a class="active" href="architecture.html">架构设计</a>
     <a href="data-dictionary.html">数据字典</a>
@@ -382,7 +383,8 @@ class Candidate:
     matched_kind: str | None
 
 def search(raw: str, *, limit: int = 20) -> list[Candidate]
-def alternatives(part: Part) -> QuerySet[Part]      # 共享任一 number_norm 的其他 Part
+def alternatives(part: Part) -> QuerySet[Part]      # 共享任一 OE / 互换号的其他 Part
+                                                    # 供应商料号相同不算替代件（不同供应商可能撞号）
 def _fuzzy(norm: str) -> list[Candidate]            # PostgreSQL: TrigramSimilarity；SQLite: difflib 对候选池（同前 3 位）计算
 </code></pre>
 <ul>

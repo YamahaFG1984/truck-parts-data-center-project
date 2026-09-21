@@ -13,6 +13,7 @@
   <nav>
     <a href="index.html">总览</a>
     <a class="active" href="manual.html">使用说明</a>
+    <a href="search-design.html">智能搜索</a>
     <a href="prd.html">PRD</a>
     <a href="architecture.html">架构设计</a>
     <a href="data-dictionary.html">数据字典</a>
@@ -91,7 +92,7 @@
 <tr><td>英文品名 / 车型</td><td><code>brake chamber volvo</code></td><td>按名称与适配车型检索</td></tr>
 <tr><td>中文名</td><td><code>刹车片</code></td><td>同上</td></tr>
 </table></div>
-<p>想限定查哪一类，加前缀：<code>oe:20443906</code>、<code>sku:FIT-BPD-00001</code>、<code>name:brake pad</code>。</p>
+<p>可以用前缀指定怎么查：<code>sku:FIT-BPD-00001</code> 只按我方料号查，<code>name:brake pad</code> 只按名称查，<code>oe:123456</code> 表示<b>把它当编号查</b>（对 <code>brake 123</code> 这种会被当成文字的输入有用）。注意 <code>oe:</code> 不限定编号类型——OE 号、互换号、供应商料号一起查，因为客户并不知道手里的号属于哪一类。详见<a href="search-design.html#s6">智能搜索详细设计 §6</a>。</p>
 
 <h3>4.2 结果上的匹配标签</h3>
 <p>每条结果左上角的标签说明"为什么命中它"，可信度由高到低：</p>

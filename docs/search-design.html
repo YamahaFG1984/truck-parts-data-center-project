@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智能搜索详细设计 · 卡车配件 AI 产品数据中心</title>
+<meta name="description" content="智能搜索（编号归一化与三级匹配）的详细设计：设计思路与取舍、业务链路、数据流转、打分与排序规则、关键代码解释，配十张图。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a href="manual.html">使用说明</a>
+    <a class="active" href="search-design.html">智能搜索</a>
+    <a href="prd.html">PRD</a>
+    <a href="architecture.html">架构设计</a>
+    <a href="data-dictionary.html">数据字典</a>
+    <a href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>智能搜索详细设计</h1>
+<p class="lede">这是整个系统的心脏：客户给一个编号、一句话或一张照片，系统要在几秒内落到唯一的 SKU 上。本文讲清四件事——为什么这样设计、业务上怎么串起来、数据怎么流动、关键代码在做什么。</p>
+<p class="meta">版本 v1.0 · 2026-09-21 · 对应代码 <code>apps/catalog/services/normalize.py</code>、<code>apps/catalog/services/matcher.py</code>、<code>apps/catalog/views.py</code></p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#s1">为什么它是核心</a></li>
+<li><a href="#s2">客户的输入有多脏</a></li>
+<li><a href="#s3">设计原则与取舍</a></li>
+<li><a href="#s4">业务链路</a></li>
+<li><a href="#s5">第一步：归一化</a></li>
+<li><a href="#s6">第二步：输入分流</a></li>
+<li><a href="#s7">第三步：三级匹配</a></li>
+<li><a href="#s8">文本与 SKU 分支</a></li>
+<li><a href="#s9">排序与去重</a></li>
+<li><a href="#s10">数据流转与查询预算</a></li>
+<li><a href="#s11">匹配能力的复用</a></li>
+<li><a href="#s12">索引与性能</a></li>
+<li><a href="#s13">怎么调阈值</a></li>
+<li><a href="#s14">边界与下一步</a></li>
+</ol></div>
+
+<h2 id="s1">1. 为什么它是核心</h2>
+<p>总经理的原话是"从图片到功能再到价格"。拆开看，价格和功能都在库里现成躺着，<b>难的是把客户嘴里那个东西对上我们的 SKU</b>。对上了，图片、规格、适配、三家成本、建议售价、替代件全都是一次查询就能拿到的附属品；对不上，后面所有功能都无从谈起。</p>
+<p>所以这个功能的目标不是"搜得到"，而是<b>把销售的响应时间从几小时压到几秒，并且答案可解释</b>——每条结果都要说清"我为什么认为是它"。</p>
+
+<!-- fig:q1 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 366" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="四种客户输入经过匹配后产出产品卡、价格、替代件与询价留痕">
+<defs><marker id="q1-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q1-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="36" width="170" height="54" rx="8"/>
+<text x="105.0" y="60" text-anchor="middle">一个编号</text>
+<text x="105.0" y="76" text-anchor="middle" class="small">OE · 互换号 · 竞品号</text>
+<rect class="box ext" x="20" y="108" width="170" height="54" rx="8"/>
+<text x="105.0" y="132" text-anchor="middle">一张照片</text>
+<text x="105.0" y="148" text-anchor="middle" class="small">铭牌可能磨损</text>
+<rect class="box ext" x="20" y="180" width="170" height="54" rx="8"/>
+<text x="105.0" y="204" text-anchor="middle">一句话</text>
+<text x="105.0" y="220" text-anchor="middle" class="small">brake chamber volvo</text>
+<rect class="box ext" x="20" y="252" width="170" height="54" rx="8"/>
+<text x="105.0" y="276" text-anchor="middle">我方 SKU</text>
+<text x="105.0" y="292" text-anchor="middle" class="small">内部料号</text>
+<rect class="box soft" x="250" y="120" width="170" height="86" rx="8"/>
+<text x="335.0" y="154" text-anchor="middle" font-weight="600">归一化 + 三级匹配</text>
+<text x="335.0" y="168" text-anchor="middle" class="small">全系统唯一实现</text>
+<text x="335.0" y="182" text-anchor="middle" class="small">只查自家数据库</text>
+<path class="arrow hi" d="M190,63 L250,163" marker-end="url(#q1-arrh)"/>
+<path class="arrow" d="M190,135 L250,163" marker-end="url(#q1-arr)"/>
+<path class="arrow" d="M190,207 L250,163" marker-end="url(#q1-arr)"/>
+<path class="arrow" d="M190,279 L250,163" marker-end="url(#q1-arr)"/>
+<rect class="box good" x="480" y="36" width="200" height="54" rx="8"/>
+<text x="580.0" y="60" text-anchor="middle">产品卡</text>
+<text x="580.0" y="76" text-anchor="middle" class="small">图 · 规格 · 适配</text>
+<path class="arrow" d="M420,163 L480,63" marker-end="url(#q1-arr)"/>
+<rect class="box good" x="480" y="108" width="200" height="54" rx="8"/>
+<text x="580.0" y="132" text-anchor="middle">三家成本 → 建议售价</text>
+<text x="580.0" y="148" text-anchor="middle" class="small">成本 × (1 + 毛利)</text>
+<path class="arrow" d="M420,163 L480,135" marker-end="url(#q1-arr)"/>
+<rect class="box good" x="480" y="180" width="200" height="54" rx="8"/>
+<text x="580.0" y="204" text-anchor="middle">替代件</text>
+<text x="580.0" y="220" text-anchor="middle" class="small">共享 OE / 互换号</text>
+<path class="arrow" d="M420,163 L480,207" marker-end="url(#q1-arr)"/>
+<rect class="box " x="480" y="252" width="200" height="54" rx="8"/>
+<text x="580.0" y="276" text-anchor="middle">询价留痕</text>
+<text x="580.0" y="292" text-anchor="middle" class="small">问了什么 · 命中没有</text>
+<path class="arrow" d="M420,163 L480,279" marker-end="url(#q1-arr)"/>
+<rect class="box good" x="740" y="90" width="180" height="54" rx="8"/>
+<text x="830.0" y="114" text-anchor="middle" font-weight="600">几秒内回复客户</text>
+<text x="830.0" y="130" text-anchor="middle" class="small">是什么 · 能不能配 · 多少钱</text>
+<path class="arrow hi" d="M680,63 L740,110" marker-end="url(#q1-arrh)"/>
+<path class="arrow hi" d="M680,135 L740,120" marker-end="url(#q1-arrh)"/>
+<path class="arrow hi" d="M680,207 L740,130" marker-end="url(#q1-arrh)"/>
+<rect class="box warn2" x="740" y="230" width="180" height="54" rx="8"/>
+<text x="830.0" y="254" text-anchor="middle">未命中最多的输入</text>
+<text x="830.0" y="270" text-anchor="middle" class="small">下一批该补什么数据</text>
+<path class="arrow" d="M680,279 L740,260" marker-end="url(#q1-arr)"/>
+<path class="arrow" d="M830,284 L830,330 L335,330 L335,206" marker-end="url(#q1-arr)" stroke-dasharray="5 4"/>
+<text x="560" y="346" text-anchor="middle" class="small">补数据 → 下次就能命中</text>
+</svg>
+<figcaption>图 Q1 · 为什么搜索是核心。四种脏输入收敛成一次匹配，匹配成功后产品卡、价格、替代件都是附属品；没命中的输入本身也是资产，它告诉你下一批该补什么。</figcaption>
+</figure>
+<!-- /fig:q1 -->
+<!-- fig:q1 -->
+
+<h2 id="s2">2. 客户的输入有多脏</h2>
+<p>设计从真实输入开始。同一个 Volvo 制动气室编号 <code>26570367</code>，在询盘里见过这些写法：</p>
+<div class="tbl narrow"><table>
+<tr><th>客户实际输入</th><th>为什么会这样</th><th>归一化后</th></tr>
+<tr><td><code>26570367</code></td><td>正常</td><td><code>26570367</code></td></tr>
+<tr><td><code>2657-0367</code></td><td>手工敲号习惯加分隔</td><td><code>26570367</code></td></tr>
+<tr><td><code>2657 0367</code></td><td>从 PDF 目录复制，空格是排版留下的</td><td><code>26570367</code></td></tr>
+<tr><td><code>２６５７０３６７</code></td><td>中文输入法下的全角数字</td><td><code>26570367</code></td></tr>
+<tr><td><code>26570367 Volvo</code></td><td>顺手把品牌也写上</td><td>编号 + 品牌线索</td></tr>
+<tr><td><code>7426570367</code></td><td>雷诺的同件号：<code>74</code> + Volvo 号</td><td>互换号，指向同一个件</td></tr>
+<tr><td><code>265703?7</code></td><td>照片上的铭牌磨掉一位</td><td>只能模糊匹配</td></tr>
+<tr><td><code>brake chamber volvo fh12</code></td><td>客户压根没有编号</td><td>走文本检索</td></tr>
+</table></div>
+<p>结论很直接：<b>任何比对之前都必须先归一化</b>，而且写入和查询必须用同一份实现，否则库里存的和查询算出来的对不上。这就是 <code>normalize_number()</code> 在全系统只有一份、被模型 <code>save()</code>、导入服务和搜索同时调用的原因。</p>
+
+<h2 id="s3">3. 设计原则与取舍</h2>
+<div class="tbl"><table>
+<tr><th>决定</th><th>备选方案</th><th>为什么这样选</th><th>放弃了什么</th></tr>
+<tr><td><b>匹配只查自家数据库</b>，大模型不参与判断</td><td>让 LLM 直接回答"这个 OE 号是什么件"</td><td>大模型没有我们的库，问它编号一定会编。编号匹配是确定性检索，命中就是 100% 准确；AI 只在读图和写文案的位置出现。</td><td>"看起来更智能"的演示效果</td></tr>
+<tr><td><b>三级降级</b>：精确 → 前缀 → 模糊</td><td>一上来就全表模糊</td><td>90% 的询价是能精确命中的，先跑最便宜的查询，命中唯一结果立即返回；模糊只在前面都没结果时兜底。既快又不会让高质量结果被相似项淹没。</td><td>实现上多几个分支</td></tr>
+<tr><td><b>pg_trgm 做模糊</b></td><td>Elasticsearch、向量检索</td><td>编号是短字符串，字符级 trigram 恰好适用；PostgreSQL 一个 GIN 索引解决，不引入第二套存储和同步问题。</td><td>语义检索能力（列入演进路线）</td></tr>
+<tr><td><b>每条结果带 match_type 与 score</b></td><td>只返回一个"最佳答案"</td><td>销售需要知道该不该再核对一遍。"精确"可以直接报价，"模糊 0.62"必须看图确认。可解释比准确率数字更有用。</td><td>界面上多一个标签</td></tr>
+<tr><td><b>exact 与 normalized 分开</b></td><td>都算精确</td><td>能对客户说"您给的格式带横杠，我们认出来了"，也提醒运营这个编号在库里的写法与客户习惯不同。</td><td>—</td></tr>
+<tr><td><b>一个产品只保留最佳候选</b></td><td>每个命中的编号一条结果</td><td>一个产品可能挂 5 个 OE 号，同时被精确和模糊命中；列表里出现 5 次同一个 SKU 是噪音。</td><td>—</td></tr>
+<tr><td><b>SQLite 回退</b></td><td>只支持 PostgreSQL</td><td>没有 docker 的机器也能演示，`pg_trgm` 不可用时退化为 difflib。测试在两个库上都跑，避免"只在一个库上正确"的代码。</td><td>回退路径的模糊质量较差，且需要多写一段</td></tr>
+</table></div>
+
+<h2 id="s4">4. 业务链路</h2>
+<p>一次询价从输入到留痕的完整链路。注意三个"人工确认"的位置——系统从不替人拍板。</p>
+
+<!-- fig:q2 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="从客户询价到报价的主链路，以及未命中反哺与 AI 补全两条闭环">
+<defs><marker id="q2-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q2-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="lane" x="10" y="10" width="920" height="150" rx="10"/>
+<text x="22" y="28" class="lane-label">主链路：从询价到报价</text>
+<rect class="box ext" x="30" y="60" width="130" height="56" rx="8"/>
+<text x="95.0" y="86" text-anchor="middle">客户询价</text>
+<text x="95.0" y="100" text-anchor="middle" class="small">编号 / 照片 / 描述</text>
+<rect class="box " x="190" y="60" width="130" height="56" rx="8"/>
+<text x="255.0" y="86" text-anchor="middle">搜索框</text>
+<text x="255.0" y="100" text-anchor="middle" class="small">或照片上传</text>
+<path class="arrow" d="M160,88 L190,88" marker-end="url(#q2-arr)"/>
+<rect class="box soft" x="350" y="60" width="140" height="56" rx="8"/>
+<text x="420.0" y="86" text-anchor="middle">候选列表</text>
+<text x="420.0" y="100" text-anchor="middle" class="small">带匹配类型与分数</text>
+<path class="arrow" d="M320,88 L350,88" marker-end="url(#q2-arr)"/>
+<rect class="box dec" x="520" y="60" width="130" height="56" rx="8"/>
+<text x="585.0" y="86" text-anchor="middle">人工确认①</text>
+<text x="585.0" y="100" text-anchor="middle" class="small">是不是这个件</text>
+<path class="arrow" d="M490,88 L520,88" marker-end="url(#q2-arr)"/>
+<rect class="box good" x="680" y="60" width="120" height="56" rx="8"/>
+<text x="740.0" y="86" text-anchor="middle">产品详情</text>
+<text x="740.0" y="100" text-anchor="middle" class="small">成本 · 替代件</text>
+<path class="arrow" d="M650,88 L680,88" marker-end="url(#q2-arr)"/>
+<rect class="box good" x="830" y="60" width="90" height="56" rx="8"/>
+<text x="875.0" y="86" text-anchor="middle">报价单</text>
+<text x="875.0" y="100" text-anchor="middle" class="small">xlsx</text>
+<path class="arrow" d="M800,88 L830,88" marker-end="url(#q2-arr)"/>
+<text x="585" y="134" text-anchor="middle" class="small">机器只排序，不拍板</text>
+<rect class="lane" x="10" y="180" width="450" height="230" rx="10"/>
+<text x="22" y="198" class="lane-label">没命中：数据反哺</text>
+<rect class="box " x="30" y="230" width="130" height="50" rx="8"/>
+<text x="95.0" y="252" text-anchor="middle">询价留痕</text>
+<text x="95.0" y="268" text-anchor="middle" class="small">每次查询一条</text>
+<path class="arrow" d="M420,116 L420,205 L95,205 L95,230" marker-end="url(#q2-arr)" stroke-dasharray="5 4"/>
+<text x="250" y="201" text-anchor="middle" class="small">自动写入</text>
+<rect class="box warn2" x="30" y="310" width="130" height="50" rx="8"/>
+<text x="95.0" y="332" text-anchor="middle">未命中榜</text>
+<text x="95.0" y="348" text-anchor="middle" class="small">近 30 天高频</text>
+<path class="arrow" d="M95,280 L95,310" marker-end="url(#q2-arr)"/>
+<rect class="box " x="200" y="310" width="120" height="50" rx="8"/>
+<text x="260.0" y="332" text-anchor="middle">找货源 / 导入</text>
+<text x="260.0" y="348" text-anchor="middle" class="small">供应商报价单</text>
+<path class="arrow" d="M160,335 L200,335" marker-end="url(#q2-arr)"/>
+<rect class="box dec" x="200" y="230" width="120" height="50" rx="8"/>
+<text x="260.0" y="252" text-anchor="middle">人工确认②</text>
+<text x="260.0" y="268" text-anchor="middle" class="small">列映射 · 预检</text>
+<path class="arrow" d="M260,310 L260,280" marker-end="url(#q2-arr)"/>
+<rect class="box good" x="360" y="265" width="80" height="50" rx="8"/>
+<text x="400.0" y="294" text-anchor="middle" font-weight="600">产品库</text>
+<path class="arrow" d="M320,255 L360,280" marker-end="url(#q2-arr)"/>
+<path class="arrow" d="M400,265 L400,215 L420,215 L420,116" marker-end="url(#q2-arr)" stroke-dasharray="5 4"/>
+<text x="330" y="218" text-anchor="middle" class="small">下次命中</text>
+<rect class="lane" x="480" y="180" width="450" height="230" rx="10"/>
+<text x="492" y="198" class="lane-label">数据不全：AI 补全</text>
+<rect class="box warn2" x="500" y="230" width="130" height="50" rx="8"/>
+<text x="565.0" y="252" text-anchor="middle">缺描述 / 缺分类</text>
+<text x="565.0" y="268" text-anchor="middle" class="small">完整度低</text>
+<rect class="box soft" x="670" y="230" width="120" height="50" rx="8"/>
+<text x="730.0" y="252" text-anchor="middle">AI 建议</text>
+<text x="730.0" y="268" text-anchor="middle" class="small">只用公开信息</text>
+<path class="arrow" d="M630,255 L670,255" marker-end="url(#q2-arr)"/>
+<rect class="box dec" x="670" y="320" width="120" height="50" rx="8"/>
+<text x="730.0" y="342" text-anchor="middle">人工确认③</text>
+<text x="730.0" y="358" text-anchor="middle" class="small">逐字段勾选</text>
+<path class="arrow" d="M730,280 L730,320" marker-end="url(#q2-arr)"/>
+<rect class="box good" x="830" y="265" width="90" height="50" rx="8"/>
+<text x="875.0" y="288" text-anchor="middle">写回产品</text>
+<text x="875.0" y="302" text-anchor="middle" class="small">source=ai</text>
+<path class="arrow" d="M790,345 L850,345 L850,315" marker-end="url(#q2-arr)"/>
+<path class="arrow" d="M875,265 L875,170 L760,170 L760,116" marker-end="url(#q2-arr)" stroke-dasharray="5 4"/>
+<text x="700" y="166" text-anchor="end" class="small">完整度上升</text>
+</svg>
+<figcaption>图 Q2 · 业务链路。主链路只有五步；黄色菱形是三个人工确认点，系统在这三处都停下来等人。两条虚线是闭环：没命中的输入变成补数据的清单，补完的数据让下一次命中。</figcaption>
+</figure>
+<!-- /fig:q2 -->
+<!-- fig:q2 -->
+
+<p>时序上，页面是边打字边查的：输入停止 300 毫秒后 HTMX 发一次请求，只替换结果区；每次查询在返回前写一条询价记录（一个 INSERT，不额外读库）。</p>
+
+<!-- fig:q3 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 524" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="搜索请求从输入去抖到返回 HTML 片段的调用时序">
+<defs><marker id="q3-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q3-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="band" x="8" y="180" width="944" height="124" rx="6"/>
+<text x="14" y="193" text-anchor="start" class="lane-label">匹配</text>
+<rect class="band" x="8" y="310" width="944" height="46" rx="6"/>
+<text x="14" y="323" text-anchor="start" class="lane-label">留痕</text>
+<rect class="band" x="8" y="362" width="944" height="124" rx="6"/>
+<text x="14" y="375" text-anchor="start" class="lane-label">渲染</text>
+<line class="life" x1="90.0" y1="60" x2="90.0" y2="516"/>
+<rect class="box ext" x="30.0" y="14" width="120" height="46" rx="8"/>
+<text x="90.0" y="42" text-anchor="middle" font-weight="600">销售</text>
+<line class="life" x1="246.0" y1="60" x2="246.0" y2="516"/>
+<rect class="box soft" x="171.0" y="14" width="150" height="46" rx="8"/>
+<text x="246.0" y="34" text-anchor="middle" font-weight="600">浏览器</text>
+<text x="246.0" y="50" text-anchor="middle" class="small">HTMX</text>
+<line class="life" x1="402.0" y1="60" x2="402.0" y2="516"/>
+<rect class="box " x="327.0" y="14" width="150" height="46" rx="8"/>
+<text x="402.0" y="34" text-anchor="middle" font-weight="600">SearchView</text>
+<text x="402.0" y="50" text-anchor="middle" class="small">catalog.views</text>
+<line class="life" x1="558.0" y1="60" x2="558.0" y2="516"/>
+<rect class="box " x="483.0" y="14" width="150" height="46" rx="8"/>
+<text x="558.0" y="34" text-anchor="middle" font-weight="600">matcher</text>
+<text x="558.0" y="50" text-anchor="middle" class="small">catalog.services</text>
+<line class="life" x1="714.0" y1="60" x2="714.0" y2="516"/>
+<rect class="box ext" x="639.0" y="14" width="150" height="46" rx="8"/>
+<text x="714.0" y="34" text-anchor="middle" font-weight="600">PostgreSQL</text>
+<text x="714.0" y="50" text-anchor="middle" class="small">pg_trgm</text>
+<line class="life" x1="870.0" y1="60" x2="870.0" y2="516"/>
+<rect class="box " x="810.0" y="14" width="120" height="46" rx="8"/>
+<text x="870.0" y="34" text-anchor="middle" font-weight="600">留痕</text>
+<text x="870.0" y="50" text-anchor="middle" class="small">inquiries</text>
+<path class="arrow" d="M90.0,92 L246.0,92" marker-end="url(#q3-arr)"/>
+<text x="168.0" y="87" text-anchor="middle" class="small">输入 2044-3906（边打边搜）</text>
+<path class="arrow" d="M246.0,114 L286.0,114 L286.0,126 L250.0,126" marker-end="url(#q3-arr)"/>
+<text x="294.0" y="124" text-anchor="start" class="small">去抖 300ms，只发最后一次</text>
+<path class="arrow" d="M246.0,144 L402.0,144" marker-end="url(#q3-arr)"/>
+<text x="324.0" y="139" text-anchor="middle" class="small">GET /search/?q=2044-3906  HX-Request</text>
+<path class="arrow" d="M402.0,166 L442.0,166 L442.0,178 L406.0,178" marker-end="url(#q3-arr)"/>
+<text x="450.0" y="176" text-anchor="start" class="small">截断到 200 字符</text>
+<path class="arrow" d="M402.0,196 L558.0,196" marker-end="url(#q3-arr)"/>
+<text x="480.0" y="191" text-anchor="middle" class="small">search(q)</text>
+<path class="arrow" d="M558.0,218 L598.0,218 L598.0,230 L562.0,230" marker-end="url(#q3-arr)"/>
+<text x="606.0" y="228" text-anchor="start" class="small">normalize → 20443906 · 判定为编号</text>
+<path class="arrow" d="M558.0,248 L714.0,248" marker-end="url(#q3-arr)"/>
+<text x="636.0" y="243" text-anchor="middle" class="small">L1: number_norm = ?  ①</text>
+<path class="arrow" d="M714.0,274 L558.0,274" marker-end="url(#q3-arr)" stroke-dasharray="5 4"/>
+<text x="636.0" y="269" text-anchor="middle" class="small">命中 1 个产品 → 不再降级</text>
+<path class="arrow" d="M558.0,300 L402.0,300" marker-end="url(#q3-arr)" stroke-dasharray="5 4"/>
+<text x="480.0" y="295" text-anchor="middle" class="small">Candidate[]（match_type + score）</text>
+<path class="arrow" d="M402.0,326 L870.0,326" marker-end="url(#q3-arr)"/>
+<text x="636.0" y="321" text-anchor="middle" class="small">log_text_search(q, 候选)  ②</text>
+<path class="arrow" d="M870.0,352 L714.0,352" marker-end="url(#q3-arr)"/>
+<text x="792.0" y="347" text-anchor="middle" class="small">INSERT：query_key 归一 · 记首个候选</text>
+<path class="arrow" d="M402.0,378 L558.0,378" marker-end="url(#q3-arr)"/>
+<text x="480.0" y="373" text-anchor="middle" class="small">prefetch_for_cards(候选)</text>
+<path class="arrow" d="M558.0,404 L714.0,404" marker-end="url(#q3-arr)"/>
+<text x="636.0" y="399" text-anchor="middle" class="small">编号 · 适配 · 图片 · 报价  ③④⑤⑥</text>
+<path class="arrow" d="M714.0,430 L558.0,430" marker-end="url(#q3-arr)" stroke-dasharray="5 4"/>
+<text x="636.0" y="425" text-anchor="middle" class="small">四次批量预取，与结果条数无关</text>
+<path class="arrow" d="M402.0,456 L246.0,456" marker-end="url(#q3-arr)" stroke-dasharray="5 4"/>
+<text x="324.0" y="451" text-anchor="middle" class="small">只返回结果区 HTML 片段</text>
+<path class="arrow" d="M246.0,482 L90.0,482" marker-end="url(#q3-arr)" stroke-dasharray="5 4"/>
+<text x="168.0" y="477" text-anchor="middle" class="small">卡片：精确 · $22.90 → $28.63 · 替代件</text>
+</svg>
+<figcaption>图 Q3 · 一次搜索的时序。① 是唯一必需的匹配查询；② 是一条 INSERT，不读库；③–⑥ 是卡片数据的四次批量预取。加上会话与用户共 9 条 SQL，测试里有预算断言守着。</figcaption>
+</figure>
+<!-- /fig:q3 -->
+<!-- fig:q3 -->
+
+<h2 id="s5">5. 第一步：归一化</h2>
+<p>四步纯函数，没有任何模型依赖，因此可以被入库路径和查询路径共用：</p>
+
+<!-- fig:q4 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="编号归一化的四个步骤以及四个输入的逐步变化">
+<defs><marker id="q4-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q4-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box soft" x="20" y="30" width="212" height="54" rx="8"/>
+<text x="126.0" y="54" text-anchor="middle">① NFKC 规范化</text>
+<text x="126.0" y="70" text-anchor="middle" class="small">全角 → 半角</text>
+<path class="arrow" d="M232,57 L252,57" marker-end="url(#q4-arr)"/>
+<rect class="box soft" x="252" y="30" width="212" height="54" rx="8"/>
+<text x="358.0" y="54" text-anchor="middle">② 去非字母数字</text>
+<text x="358.0" y="70" text-anchor="middle" class="small">空格 横杠 点 斜杠</text>
+<path class="arrow" d="M464,57 L484,57" marker-end="url(#q4-arr)"/>
+<rect class="box soft" x="484" y="30" width="212" height="54" rx="8"/>
+<text x="590.0" y="54" text-anchor="middle">③ 转大写</text>
+<text x="590.0" y="70" text-anchor="middle" class="small">大小写不敏感</text>
+<path class="arrow" d="M696,57 L716,57" marker-end="url(#q4-arr)"/>
+<rect class="box ext" x="716" y="30" width="212" height="54" rx="8"/>
+<text x="822.0" y="54" text-anchor="middle">④ 空结果 = 非编号</text>
+<text x="822.0" y="70" text-anchor="middle" class="small">纯中文落到文本检索</text>
+<text x="20" y="118" text-anchor="start" class="lane-label">示例</text>
+<rect class="lane" x="20" y="144" width="900" height="32" rx="6"/>
+<text x="32" y="164" text-anchor="start" class="small">A 000 420 15 20</text>
+<text x="264" y="164" text-anchor="start" class="small">A 000 420 15 20</text>
+<text x="496" y="164" text-anchor="start" class="small">A0004201520</text>
+<text x="700" y="164" text-anchor="start" class="small">A0004201520</text>
+<text x="830" y="164" text-anchor="start" class="small">Mercedes 原厂号</text>
+<rect class="lane" x="20" y="182" width="900" height="32" rx="6"/>
+<text x="32" y="202" text-anchor="start" class="small">２０４４-3906</text>
+<text x="264" y="202" text-anchor="start" class="small">2044-3906</text>
+<text x="496" y="202" text-anchor="start" class="small">20443906</text>
+<text x="700" y="202" text-anchor="start" class="small">20443906</text>
+<text x="830" y="202" text-anchor="start" class="small">全角 + 横杠</text>
+<rect class="lane" x="20" y="220" width="900" height="32" rx="6"/>
+<text x="32" y="240" text-anchor="start" class="small">wg9100470107</text>
+<text x="264" y="240" text-anchor="start" class="small">wg9100470107</text>
+<text x="496" y="240" text-anchor="start" class="small">wg9100470107</text>
+<text x="700" y="240" text-anchor="start" class="small">WG9100470107</text>
+<text x="830" y="240" text-anchor="start" class="small">HOWO 小写</text>
+<rect class="lane" x="20" y="258" width="900" height="32" rx="6"/>
+<text x="32" y="278" text-anchor="start" class="small">刹车片</text>
+<text x="264" y="278" text-anchor="start" class="small">刹车片</text>
+<text x="496" y="278" text-anchor="start" class="small">（空）</text>
+<text x="700" y="278" text-anchor="start" class="small">（空）</text>
+<text x="830" y="278" text-anchor="start" class="small">→ 文本检索</text>
+<text x="32" y="136" text-anchor="start" class="legend">输入</text>
+<text x="264" y="136" text-anchor="start" class="legend">① 之后</text>
+<text x="496" y="136" text-anchor="start" class="legend">② 之后</text>
+<text x="700" y="136" text-anchor="start" class="legend">③ 结果</text>
+</svg>
+<figcaption>图 Q4 · 归一化的四步与逐步结果。同一个函数被模型 save()、导入服务和搜索三处调用，写入与查询算出来的值才可能相等。</figcaption>
+</figure>
+<!-- /fig:q4 -->
+<!-- fig:q4 -->
+
+<pre><code>def normalize_number(raw: str | None) -> str:
+    """Full-width to half-width, drop every non-alphanumeric character, upper-case."""
+    if raw is None:
+        return ""
+    text = unicodedata.normalize("NFKC", str(raw))
+    return _NON_ALNUM.sub("", text).upper()</code></pre>
+<p>几个刻意的决定：</p>
+<ul>
+<li><b>NFKC 而不是手写全角表</b>：一行搞定全角数字、全角字母、部分兼容字符，还顺手处理了从 Excel 复制来的不可见字符。</li>
+<li><b>保留前导 0</b>：Bosch 的 <code>0 986 467 422</code> 归一化后是 <code>0986467422</code>，前导 0 是编号的一部分。这也是导入时所有单元格按<b>文本</b>读取的原因——一旦被 Excel 当数字，前导 0 就没了。</li>
+<li><b>非拉丁文本归一化后为空</b>：纯中文输入不会被误当成编号，自然落到文本检索分支。</li>
+<li><b>一格多号要先拆再归一</b>：<code>split_numbers()</code> 固定按 <code>, ; 、 |</code> 和换行拆；<b>斜杠只在两侧都够长时才拆</b>——<code>20443906/20568713</code> 是两个号，而 MANN 滤芯 <code>WK 1080/7</code> 是一个号。这条规则是从真实供应商表里抠出来的。</li>
+</ul>
+
+<h2 id="s6">6. 第二步：输入分流</h2>
+<p>归一化之后要先判断"这是什么"，再决定走哪条检索路径。判定按固定顺序短路：</p>
+
+<!-- fig:q5 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="搜索输入被判定为 sku、number 或 text 的决策树">
+<defs><marker id="q5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q5-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="30" width="150" height="48" rx="8"/>
+<text x="95.0" y="58" text-anchor="middle">搜索框输入</text>
+<rect class="box dec" x="220" y="30" width="220" height="48" rx="8"/>
+<text x="330.0" y="58" text-anchor="middle">有 sku: / oe: / name: 前缀？</text>
+<path class="arrow" d="M170,54 L220,54" marker-end="url(#q5-arr)"/>
+<rect class="box good" x="500" y="30" width="170" height="48" rx="8"/>
+<text x="585.0" y="58" text-anchor="middle">按前缀指定的分支</text>
+<path class="arrow" d="M440,54 L500,54" marker-end="url(#q5-arr)"/>
+<text x="468" y="47" text-anchor="middle" class="small">是</text>
+<rect class="box dec" x="220" y="110" width="220" height="48" rx="8"/>
+<text x="330.0" y="138" text-anchor="middle">归一化后含数字？</text>
+<path class="arrow" d="M330,78 L330,110" marker-end="url(#q5-arr)"/>
+<text x="338" y="96" text-anchor="start" class="small">否</text>
+<rect class="box good" x="500" y="110" width="170" height="48" rx="8"/>
+<text x="585.0" y="138" text-anchor="middle">text：文本检索</text>
+<path class="arrow" d="M440,134 L500,134" marker-end="url(#q5-arr)"/>
+<text x="468" y="127" text-anchor="middle" class="small">否</text>
+<rect class="box dec" x="220" y="190" width="220" height="48" rx="8"/>
+<text x="330.0" y="218" text-anchor="middle">以 FIT- 开头？</text>
+<path class="arrow" d="M330,158 L330,190" marker-end="url(#q5-arr)"/>
+<text x="338" y="176" text-anchor="start" class="small">是</text>
+<rect class="box good" x="500" y="190" width="170" height="48" rx="8"/>
+<text x="585.0" y="218" text-anchor="middle">sku：料号检索</text>
+<path class="arrow" d="M440,214 L500,214" marker-end="url(#q5-arr)"/>
+<text x="468" y="207" text-anchor="middle" class="small">是</text>
+<rect class="box dec" x="220" y="270" width="220" height="62" rx="8"/>
+<text x="330.0" y="292" text-anchor="middle">长度 ≥ 5 且字母占比 &lt; 50%？</text>
+<text x="330.0" y="306" text-anchor="middle" class="small">A0004201520 → 是</text>
+<text x="330.0" y="320" text-anchor="middle" class="small">BRAKE12 → 否</text>
+<path class="arrow" d="M330,238 L330,270" marker-end="url(#q5-arr)"/>
+<text x="338" y="256" text-anchor="start" class="small">否</text>
+<rect class="box good" x="500" y="270" width="170" height="48" rx="8"/>
+<text x="585.0" y="298" text-anchor="middle" font-weight="600">number：编号匹配</text>
+<path class="arrow" d="M440,294 L500,294" marker-end="url(#q5-arr)"/>
+<text x="468" y="287" text-anchor="middle" class="small">是</text>
+<path class="arrow" d="M330,332 L330,368 L700,368 L700,134 L670,134" marker-end="url(#q5-arr)"/>
+<text x="470" y="386" text-anchor="middle" class="small">否 → 落回 text 分支</text>
+<rect class="box ext" x="710" y="150" width="210" height="110" rx="8"/>
+<text x="815.0" y="182" text-anchor="middle">oe: 的真实语义</text>
+<text x="815.0" y="196" text-anchor="middle" class="small">= 强制按编号查，</text>
+<text x="815.0" y="210" text-anchor="middle" class="small">不限定 kind=OE。</text>
+<text x="815.0" y="224" text-anchor="middle" class="small">客户并不知道手里的号</text>
+<text x="815.0" y="238" text-anchor="middle" class="small">属于 OE 还是互换号。</text>
+</svg>
+<figcaption>图 Q5 · 输入分流的判定顺序，从上到下短路。字母占比这一条把 BRAKE12 这类带数字的英文词挡在编号分支之外。</figcaption>
+</figure>
+<!-- /fig:q5 -->
+<!-- fig:q5 -->
+
+<pre><code>def detect_query_kind(raw, sku_prefix=None) -> Literal["sku", "number", "text"]:
+    explicit, text = split_query_prefix(raw)      # sku: / oe: / name: 显式前缀优先
+    if explicit:
+        return explicit
+    norm = normalize_number(text)
+    if not norm or not any(ch.isdigit() for ch in norm):
+        return "text"                             # 没有数字，不可能是编号
+    if prefix_norm and norm.startswith(prefix_norm):
+        return "sku"                              # 以 FIT- 开头
+    letters = sum(ch.isalpha() for ch in norm)
+    if len(norm) >= 5 and letters / len(norm) &lt; 0.5:
+        return "number"                           # 够长、数字为主
+    return "text"</code></pre>
+<div class="note"><b>三个前缀的真实语义。</b><code>sku:</code> 和 <code>name:</code> 会切换到对应的检索分支；<code>oe:</code> 的意思是"<b>把它当编号查</b>"，让 <code>brake 123</code> 这种会被判成文本的输入强制走编号匹配，<b>它并不限定只搜 kind=OE 的编号</b>——编号匹配一视同仁地查 OE、互换号和供应商料号，因为客户并不知道自己手里的号属于哪一类。</div>
+
+<h2 id="s7">7. 第三步：三级匹配</h2>
+<p>三级的顺序、短路与降级条件：</p>
+
+<!-- fig:q6 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="三级匹配的流程、短路条件与合并排序">
+<defs><marker id="q6-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q6-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="24" width="150" height="44" rx="8"/>
+<text x="95.0" y="50" text-anchor="middle">归一化后的编号</text>
+<rect class="box soft" x="220" y="20" width="260" height="52" rx="8"/>
+<text x="350.0" y="44" text-anchor="middle" font-weight="600">L1 精确 / 归一化</text>
+<text x="350.0" y="58" text-anchor="middle" class="small">number_norm = ? 一条索引查询</text>
+<path class="arrow" d="M170,46 L220,46" marker-end="url(#q6-arr)"/>
+<rect class="box dec" x="540" y="20" width="200" height="52" rx="8"/>
+<text x="640.0" y="50" text-anchor="middle">命中唯一一个产品？</text>
+<path class="arrow" d="M480,46 L540,46" marker-end="url(#q6-arr)"/>
+<rect class="box good" x="790" y="20" width="150" height="52" rx="8"/>
+<text x="865.0" y="44" text-anchor="middle" font-weight="600">直接返回</text>
+<text x="865.0" y="58" text-anchor="middle" class="small">最常见的情形</text>
+<path class="arrow hi" d="M740,46 L790,46" marker-end="url(#q6-arrh)"/>
+<text x="762" y="39" text-anchor="middle" class="small">是</text>
+<rect class="box soft" x="220" y="130" width="260" height="62" rx="8"/>
+<text x="350.0" y="152" text-anchor="middle">L2 前缀 / 包含</text>
+<text x="350.0" y="166" text-anchor="middle" class="small">双向 contains，长度 ≥ 5</text>
+<text x="350.0" y="180" text-anchor="middle" class="small">0.8 × 短/长</text>
+<path class="arrow" d="M640,72 L640,104 L350,104 L350,130" marker-end="url(#q6-arr)"/>
+<text x="500" y="100" text-anchor="middle" class="small">否（0 个或多个）</text>
+<rect class="box dec" x="540" y="130" width="200" height="62" rx="8"/>
+<text x="640.0" y="166" text-anchor="middle">候选已满 20 条？</text>
+<path class="arrow" d="M480,161 L540,161" marker-end="url(#q6-arr)"/>
+<rect class="box soft" x="220" y="250" width="260" height="62" rx="8"/>
+<text x="350.0" y="272" text-anchor="middle">L3 模糊</text>
+<text x="350.0" y="286" text-anchor="middle" class="small">pg_trgm ≥ 0.45</text>
+<text x="350.0" y="300" text-anchor="middle" class="small">少于 3 字符直接跳过</text>
+<path class="arrow" d="M640,192 L640,224 L350,224 L350,250" marker-end="url(#q6-arr)"/>
+<text x="500" y="220" text-anchor="middle" class="small">否</text>
+<rect class="box good" x="790" y="130" width="150" height="182" rx="8"/>
+<text x="865.0" y="198" text-anchor="middle" font-weight="600">合并</text>
+<text x="865.0" y="212" text-anchor="middle" class="small">① 同一产品</text>
+<text x="865.0" y="226" text-anchor="middle" class="small">只留最佳候选</text>
+<text x="865.0" y="240" text-anchor="middle" class="small">② 按四层排序键</text>
+<text x="865.0" y="254" text-anchor="middle" class="small">③ 截断到 20 条</text>
+<path class="arrow" d="M740,161 L790,190" marker-end="url(#q6-arr)"/>
+<text x="760" y="152" text-anchor="middle" class="small">是</text>
+<path class="arrow" d="M480,281 L790,281" marker-end="url(#q6-arr)"/>
+<rect class="box ext" x="20" y="326" width="900" height="36" rx="6"/>
+<text x="470.0" y="348" text-anchor="middle">命中多个产品时反而要继续降级：说明这个号挂在几个 SKU 上，销售需要更多线索来挑</text>
+<text x="20" y="392" text-anchor="start" class="lane-label">不走三级的两条分支（同样产出 Candidate，走同一套合并与排序）</text>
+<rect class="box " x="20" y="402" width="260" height="62" rx="8"/>
+<text x="150.0" y="424" text-anchor="middle">text 分支</text>
+<text x="150.0" y="438" text-anchor="middle" class="small">token AND + 品牌别名</text>
+<text x="150.0" y="452" text-anchor="middle" class="small">全不中再 trigram 兜错拼写</text>
+<rect class="box " x="320" y="402" width="220" height="62" rx="8"/>
+<text x="430.0" y="424" text-anchor="middle">sku 分支</text>
+<text x="430.0" y="438" text-anchor="middle" class="small">iexact 命中即返回</text>
+<text x="430.0" y="452" text-anchor="middle" class="small">否则 istartswith 列出</text>
+<path class="arrow" d="M150,464 L150,486 L860,486 L860,312" marker-end="url(#q6-arr)" stroke-dasharray="5 4"/>
+<path class="arrow" d="M430,464 L430,486" stroke-dasharray="5 4"/>
+</svg>
+<figcaption>图 Q6 · 三级匹配的短路与降级。绿色是出口；只有"候选不够"才会进入下一级，所以 90% 的查询只花一条索引查询。</figcaption>
+</figure>
+<!-- /fig:q6 -->
+<!-- fig:q6 -->
+
+<pre><code>def search(raw, *, limit=MAX_RESULTS) -> list[Candidate]:
+    _, text = split_query_prefix(raw)
+    kind = detect_query_kind(raw)
+    norm = normalize_number(text)
+    if not norm and not text.strip():
+        return []
+
+    if kind == "sku":
+        return _by_sku(text, limit)
+    if kind == "text":
+        return _by_name(text, limit)
+
+    found = _exact(_as_typed(raw), norm)
+    if len({c.part.pk for c in found}) == 1:
+        return _best_per_part(found)          # 唯一命中：不再往下跑
+    if len(found) &lt; limit:
+        found += _prefix(norm, limit)
+    if len(_best_per_part(found)) &lt; limit:
+        found += _fuzzy(norm, limit)
+    return _best_per_part(found)[:limit]</code></pre>
+<p>两处短路值得注意：<b>L1 命中唯一一个产品就直接返回</b>（最常见的情形，代价是一条索引查询）；<b>命中多个产品时反而要继续</b>——那说明这个号挂在几个 SKU 上，销售需要看到更多线索来挑，此时补上前缀与模糊结果反而有用。</p>
+
+<h3>7.1 L1 精确与归一化</h3>
+<pre><code>def _exact(typed: str, norm: str) -> list[Candidate]:
+    rows = PartNumber.objects.filter(number_norm=norm).select_related("part__category__parent")
+    return [
+        _candidate(pn, "exact", 1.0) if pn.number == typed else _candidate(pn, "normalized", 0.95)
+        for pn in rows
+    ]</code></pre>
+<p>查询只用 <code>number_norm</code> 的索引，一条 SQL。<b>exact 与 normalized 的区别不在数据库层，而在与"原样输入"的字符串比较</b>：<code>_as_typed()</code> 剥掉 <code>oe:</code> 之类的前缀，但<b>不做全角折叠</b>。所以客户输入全角 <code>２６５７０３６７</code> 时命中的是 normalized——界面会说"归一化后命中"，这正是我们想告诉销售的事实。这个细节曾经写反过：早期版本拿归一化后的串去比，全角输入被标成"精确"，但显示的编号和客户输入的明显不同，反而让人困惑。</p>
+
+<h3>7.2 L2 前缀 / 包含</h3>
+<p>处理带后缀的变体（<code>20443906-1</code>）、带前缀的写法（<code>VOLVO20443906</code>）、以及客户把两个号连在一起发过来的情况。双向包含：</p>
+<pre><code>cond = Q(query__contains=F("number_norm")) & Q(norm_len__gte=MIN_CONTAINED_LEN)
+if len(norm) >= MIN_CONTAINED_LEN:
+    cond |= Q(number_norm__contains=norm)
+...
+_candidate(pn, "prefix", 0.8 * min(len(norm), pn.norm_len) / max(len(norm), pn.norm_len))</code></pre>
+
+<!-- fig:q7 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 280" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="前缀包含匹配的两个方向、打分公式与最小长度安全阀">
+<defs><marker id="q7-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q7-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<text x="20" y="30" text-anchor="start" class="lane-label">方向一：库里的编号带后缀 / 前缀</text>
+<rect class="box ext" x="20" y="44" width="200" height="46" rx="8"/>
+<text x="120.0" y="64" text-anchor="middle">查询 20443906</text>
+<text x="120.0" y="80" text-anchor="middle" class="small">8 位</text>
+<rect class="box soft" x="260" y="44" width="220" height="46" rx="8"/>
+<text x="370.0" y="64" text-anchor="middle">库里 20443906-1</text>
+<text x="370.0" y="80" text-anchor="middle" class="small">归一化 204439061 · 9 位</text>
+<path class="arrow" d="M220,67 L260,67" marker-end="url(#q7-arr)"/>
+<text x="240" y="38" text-anchor="middle" class="small">被包含</text>
+<rect class="box good" x="520" y="44" width="180" height="46" rx="8"/>
+<text x="610.0" y="72" text-anchor="middle">0.8 × 8 / 9 = 0.71</text>
+<path class="arrow" d="M480,67 L520,67" marker-end="url(#q7-arr)"/>
+<text x="20" y="130" text-anchor="start" class="lane-label">方向二：客户把品牌和编号连在一起</text>
+<rect class="box ext" x="20" y="144" width="200" height="46" rx="8"/>
+<text x="120.0" y="164" text-anchor="middle">查询 VOLVO20443906</text>
+<text x="120.0" y="180" text-anchor="middle" class="small">13 位</text>
+<rect class="box soft" x="260" y="144" width="220" height="46" rx="8"/>
+<text x="370.0" y="164" text-anchor="middle">库里 20443906</text>
+<text x="370.0" y="180" text-anchor="middle" class="small">8 位</text>
+<path class="arrow" d="M220,167 L260,167" marker-end="url(#q7-arr)"/>
+<text x="240" y="138" text-anchor="middle" class="small">包含它</text>
+<rect class="box good" x="520" y="144" width="180" height="46" rx="8"/>
+<text x="610.0" y="172" text-anchor="middle">0.8 × 8 / 13 = 0.49</text>
+<path class="arrow" d="M480,167 L520,167" marker-end="url(#q7-arr)"/>
+<rect class="box warn2" x="730" y="44" width="190" height="146" rx="8"/>
+<text x="825.0" y="80" text-anchor="middle">安全阀</text>
+<text x="825.0" y="94" text-anchor="middle" class="small">MIN_CONTAINED_LEN = 5</text>
+<text x="825.0" y="108" text-anchor="middle" class="small"></text>
+<text x="825.0" y="122" text-anchor="middle" class="small">库里短于 5 位的编号</text>
+<text x="825.0" y="136" text-anchor="middle" class="small">不参与&quot;被包含&quot;判断，</text>
+<text x="825.0" y="150" text-anchor="middle" class="small">否则一个 123 会命中</text>
+<text x="825.0" y="164" text-anchor="middle" class="small">几乎所有查询。</text>
+<rect class="box ext" x="20" y="226" width="680" height="36" rx="6"/>
+<text x="360.0" y="248" text-anchor="middle">打分用长度比而不是常数：多一位后缀的候选，一定排在多五位的前面</text>
+</svg>
+<figcaption>图 Q7 · L2 的双向包含与打分。分数越接近 0.8，说明两个编号长度越接近、越可能是同一个件的变体。</figcaption>
+</figure>
+<!-- /fig:q7 -->
+<!-- fig:q7 -->
+
+<p><code>MIN_CONTAINED_LEN = 5</code> 是这一级的安全阀：<b>库里短于 5 位的编号不参与"被包含"判断</b>，否则一个 <code>123</code> 的编号会命中几乎所有查询。打分用长度比而不是常数，是为了让"多一位后缀"排在"多五位"前面。</p>
+
+<h3>7.3 L3 模糊</h3>
+<p>只在前两级都不足时才跑，且归一化后少于 3 个字符直接放弃（太短的串和什么都相似）。两个数据库走两条路：</p>
+
+<!-- fig:q8 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="PostgreSQL 与 SQLite 两种模糊匹配实现的对比">
+<defs><marker id="q8-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q8-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="lane" x="10" y="10" width="450" height="270" rx="10"/>
+<text x="22" y="28" class="lane-label">PostgreSQL：数据库算</text>
+<rect class="box good" x="30" y="50" width="180" height="46" rx="8"/>
+<text x="120.0" y="70" text-anchor="middle">GIN trigram 索引</text>
+<text x="120.0" y="86" text-anchor="middle" class="small">gin_trgm_ops</text>
+<rect class="box soft" x="30" y="120" width="180" height="46" rx="8"/>
+<text x="120.0" y="140" text-anchor="middle">trigram_similar 预筛</text>
+<text x="120.0" y="156" text-anchor="middle" class="small">索引扫描，筛掉绝大多数</text>
+<path class="arrow" d="M120,96 L120,120" marker-end="url(#q8-arr)"/>
+<rect class="box soft" x="30" y="190" width="180" height="46" rx="8"/>
+<text x="120.0" y="210" text-anchor="middle">similarity ≥ 0.45</text>
+<text x="120.0" y="226" text-anchor="middle" class="small">SQL 内排序</text>
+<path class="arrow" d="M120,166 L120,190" marker-end="url(#q8-arr)"/>
+<rect class="box ext" x="250" y="120" width="190" height="116" rx="8"/>
+<text x="345.0" y="148" text-anchor="middle">为什么是 0.45</text>
+<text x="345.0" y="162" text-anchor="middle" class="small">7–8 位编号：</text>
+<text x="345.0" y="176" text-anchor="middle" class="small">错一位 ≈ 0.45–0.55</text>
+<text x="345.0" y="190" text-anchor="middle" class="small">错两位 &lt; 0.3</text>
+<text x="345.0" y="204" text-anchor="middle" class="small"></text>
+<text x="345.0" y="218" text-anchor="middle" class="small">阈值取&quot;错一位&quot;的下沿</text>
+<path class="arrow" d="M210,213 L250,190" stroke-dasharray="5 4"/>
+<rect class="lane" x="480" y="10" width="450" height="270" rx="10"/>
+<text x="492" y="28" class="lane-label">SQLite 回退：Python 算</text>
+<rect class="box warn2" x="500" y="50" width="190" height="46" rx="8"/>
+<text x="595.0" y="70" text-anchor="middle">首 3 位或末 3 位取池</text>
+<text x="595.0" y="86" text-anchor="middle" class="small">上限 2000 行</text>
+<rect class="box soft" x="500" y="120" width="190" height="46" rx="8"/>
+<text x="595.0" y="140" text-anchor="middle">difflib 逐个打分</text>
+<text x="595.0" y="156" text-anchor="middle" class="small">SequenceMatcher</text>
+<path class="arrow" d="M595,96 L595,120" marker-end="url(#q8-arr)"/>
+<rect class="box soft" x="500" y="190" width="190" height="46" rx="8"/>
+<text x="595.0" y="210" text-anchor="middle">ratio ≥ 0.75</text>
+<text x="595.0" y="226" text-anchor="middle" class="small">阈值必须单独量</text>
+<path class="arrow" d="M595,166 L595,190" marker-end="url(#q8-arr)"/>
+<rect class="box ext" x="730" y="120" width="190" height="116" rx="8"/>
+<text x="825.0" y="148" text-anchor="middle">为什么不能共用阈值</text>
+<text x="825.0" y="162" text-anchor="middle" class="small">difflib 与 trigram 的</text>
+<text x="825.0" y="176" text-anchor="middle" class="small">分数分布不同：</text>
+<text x="825.0" y="190" text-anchor="middle" class="small">同一对编号，difflib</text>
+<text x="825.0" y="204" text-anchor="middle" class="small">普遍给得更高。</text>
+<text x="825.0" y="218" text-anchor="middle" class="small">两个库都跑同一套测试。</text>
+<path class="arrow" d="M690,213 L730,190" stroke-dasharray="5 4"/>
+</svg>
+<figcaption>图 Q8 · 模糊匹配的两条实现。左边是生产路径，右边是没有 docker 时的演示路径；两条路径的阈值分别量过，测试在两个库上都跑。</figcaption>
+</figure>
+<!-- /fig:q8 -->
+<!-- fig:q8 -->
+
+<pre><code>rows = (
+    PartNumber.objects.filter(number_norm__trigram_similar=norm)   # 命中 GIN 索引
+    .annotate(similarity=TrigramSimilarity("number_norm", norm))
+    .filter(similarity__gte=FUZZY_THRESHOLD)                       # 0.45
+    .exclude(number_norm=norm)
+    .order_by("-similarity")[: limit * 3]
+)</code></pre>
+<p>先用 <code>trigram_similar</code> 让 GIN 索引筛掉绝大多数行，再算精确相似度排序——反过来写会变成全表算分。阈值 <code>0.45</code> 是量出来的：7–8 位编号错一位大约落在 0.45–0.55，错两位掉到 0.3 以下。SQLite 回退用 difflib，阈值必须提到 <code>0.75</code>（两种算法的分布不同），并且先用首三位或末三位从库里取不超过 2000 行做候选池，避免在 Python 里扫全表。</p>
+
+<h2 id="s8">8. 文本与 SKU 分支</h2>
+<p>没有编号的查询走两段式：先字面 AND 过滤，全不中再用 trigram 兜错拼写。</p>
+
+<!-- fig:q9 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 340" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="文本检索的 token AND 过滤与错拼回退两段流程">
+<defs><marker id="q9-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q9-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="30" width="200" height="46" rx="8"/>
+<text x="120.0" y="50" text-anchor="middle">brake chamber volvo</text>
+<text x="120.0" y="66" text-anchor="middle" class="small">按空格切成 3 个 token</text>
+<rect class="box soft" x="270" y="30" width="200" height="46" rx="8"/>
+<text x="370.0" y="50" text-anchor="middle">品牌别名归一</text>
+<text x="370.0" y="66" text-anchor="middle" class="small">沃尔沃 / benz / howo → 标准名</text>
+<path class="arrow" d="M220,53 L270,53" marker-end="url(#q9-arr)"/>
+<rect class="box soft" x="520" y="20" width="400" height="66" rx="8"/>
+<text x="720.0" y="50" text-anchor="middle" font-weight="600">每个 token 都必须命中（AND）</text>
+<text x="720.0" y="66" text-anchor="middle" class="small">品名 · 中文名 · 分类名 · 分类英文名 · 车系 · 品牌</text>
+<path class="arrow" d="M470,53 L520,53" marker-end="url(#q9-arr)"/>
+<rect class="box dec" x="520" y="120" width="200" height="46" rx="8"/>
+<text x="620.0" y="148" text-anchor="middle">有结果？</text>
+<path class="arrow" d="M720,86 L720,110 L620,110 L620,120" marker-end="url(#q9-arr)"/>
+<rect class="box good" x="780" y="120" width="140" height="46" rx="8"/>
+<text x="850.0" y="140" text-anchor="middle">name  0.7</text>
+<text x="850.0" y="156" text-anchor="middle" class="small">字面命中</text>
+<path class="arrow" d="M720,143 L780,143" marker-end="url(#q9-arr)"/>
+<text x="742" y="136" text-anchor="middle" class="small">是</text>
+<rect class="box warn2" x="520" y="200" width="400" height="62" rx="8"/>
+<text x="720.0" y="228" text-anchor="middle">TrigramWordSimilarity(name_en) ≥ 0.3</text>
+<text x="720.0" y="244" text-anchor="middle" class="small">多半是拼错：brake chambr</text>
+<path class="arrow" d="M620,166 L620,200" marker-end="url(#q9-arr)"/>
+<text x="628" y="186" text-anchor="start" class="small">否</text>
+<rect class="box ext" x="520" y="280" width="400" height="40" rx="6"/>
+<text x="720.0" y="304" text-anchor="middle">分数 = 0.6 × 相似度 → 排序上必定落在字面命中之后</text>
+<path class="arrow" d="M720,262 L720,280" marker-end="url(#q9-arr)"/>
+<rect class="box ext" x="20" y="120" width="200" height="142" rx="8"/>
+<text x="120.0" y="168" text-anchor="middle">为什么是 AND</text>
+<text x="120.0" y="182" text-anchor="middle" class="small">三个词都是筛选条件。</text>
+<text x="120.0" y="196" text-anchor="middle" class="small">用 OR 会把所有刹车件</text>
+<text x="120.0" y="210" text-anchor="middle" class="small">都倒出来，销售还得</text>
+<text x="120.0" y="224" text-anchor="middle" class="small">自己翻——那等于没搜。</text>
+</svg>
+<figcaption>图 Q9 · 没有编号时的两段式文本检索。先字面 AND，全不中才用 trigram 兜错拼写，并且分数打折，保证它排在确定性结果之后。</figcaption>
+</figure>
+<!-- /fig:q9 -->
+<!-- fig:q9 -->
+
+<pre><code>for token in tokens:
+    brand = canonical_brand(token)                 # "沃尔沃" / "benz" / "howo" → 标准品牌名
+    cond = (
+        Q(name_en__icontains=token) | Q(name_zh__icontains=token)
+        | Q(category__name__icontains=token) | Q(category__name_en__icontains=token)
+        | Q(fitments__model__icontains=token) | Q(fitments__make__icontains=brand or token)
+    )
+    qs = qs.filter(cond)                           # 每个 token 都必须命中：AND 语义</code></pre>
+<p>为什么是 AND：<code>brake chamber volvo</code> 里三个词都是筛选条件，OR 会把所有刹车件都倒出来。品牌走别名表是因为客户会写 <code>Benz</code>、<code>MB</code>、<code>奔驰</code>，而库里统一存 <code>Mercedes-Benz</code>。字面全不中时（多半是拼错，如 <code>brake chambr</code>）才用 <code>TrigramWordSimilarity</code>，阈值 0.3，分数打 0.6 折——它的可信度明显低于字面命中，排序上必须靠后。</p>
+<p>SKU 分支最简单：<code>sku__iexact</code> 命中就直接返回，否则按 <code>sku__istartswith</code> 列出，方便运营输 <code>FIT-BPD</code> 看整个刹车片系列。</p>
+
+<h2 id="s9">9. 排序与去重</h2>
+<p>所有候选合到一起后，先按产品去重（保留该产品的最佳候选），再按一个四层排序键排序：</p>
+
+<!-- fig:q10 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="候选排序的四层键与按产品去重的说明">
+<defs><marker id="q10-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q10-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box soft" x="20" y="30" width="560" height="44" rx="8"/>
+<text x="300.0" y="56" text-anchor="middle">① 匹配类型　精确 0 &lt; 归一化 1 &lt; 前缀 2 &lt; 模糊 3 &lt; 名称 4</text>
+<rect class="box soft" x="50" y="84" width="500" height="44" rx="8"/>
+<text x="300.0" y="110" text-anchor="middle">② 分数降序　同类型内，相似度高的在前</text>
+<rect class="box good" x="80" y="138" width="440" height="44" rx="8"/>
+<text x="300.0" y="164" text-anchor="middle">③ 完整度降序　同样可信时，资料全的销售更愿意直接用</text>
+<rect class="box " x="110" y="192" width="380" height="44" rx="8"/>
+<text x="300.0" y="218" text-anchor="middle">④ SKU 升序　兜底：顺序确定，测试可断言</text>
+<text x="20" y="260" text-anchor="start" class="lane-label">示例：同一个号挂在三个产品上</text>
+<text x="32" y="285" text-anchor="start" class="small">精确 1.00 · 完整度 45　→　归一化 0.95 · 完整度 90　→　模糊 0.62 · 完整度 100</text>
+<text x="32" y="305" text-anchor="start" class="legend">匹配类型永远优先于完整度：可信度比资料齐全更重要</text>
+<rect class="box ext" x="620" y="30" width="300" height="190" rx="8"/>
+<text x="770.0" y="80" text-anchor="middle">去重在排序之前</text>
+<text x="770.0" y="96" text-anchor="middle" class="small">一个产品可能挂 5 个 OE 号，</text>
+<text x="770.0" y="110" text-anchor="middle" class="small">同时被精确和模糊命中。</text>
+<text x="770.0" y="124" text-anchor="middle" class="small"></text>
+<text x="770.0" y="138" text-anchor="middle" class="small">_best_per_part() 按同一个</text>
+<text x="770.0" y="152" text-anchor="middle" class="small">排序键为每个产品只留一条，</text>
+<text x="770.0" y="166" text-anchor="middle" class="small">否则列表里会出现 5 次</text>
+<text x="770.0" y="180" text-anchor="middle" class="small">同一个 SKU。</text>
+</svg>
+<figcaption>图 Q10 · 四层排序键。前两层是可信度，第三层是业务判断，第四层保证顺序确定。</figcaption>
+</figure>
+<!-- /fig:q10 -->
+<!-- fig:q10 -->
+
+<pre><code>@property
+def sort_key(self):
+    part = self.part
+    return (_PRIORITY[self.match_type],   # 1. 匹配类型：精确 &lt; 归一化 &lt; 前缀 &lt; 模糊 &lt; 名称
+            -self.score,                  # 2. 同类型内分数高的在前
+            -part.completeness_score,     # 3. 分数相同，资料全的在前
+            part.sku)                     # 4. 兜底：稳定排序，测试可断言</code></pre>
+<p>第三层是业务判断而非技术选择：两个同样可信的候选，<b>资料全的那个销售更愿意直接用</b>（有图、有包装、有报价，能立刻回复客户）。第四层保证同样条件下顺序确定，否则测试会随数据库返回顺序抖动。</p>
+
+<h2 id="s10">10. 数据流转与查询预算</h2>
+<p>一次完整的搜索请求，从浏览器到 HTML 片段，以及每一步花掉多少条 SQL：</p>
+
+<!-- fig:q11 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 440" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="一次搜索请求中数据在视图、服务、数据库与模板之间的流动与 SQL 条数">
+<defs><marker id="q11-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q11-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="40" width="140" height="56" rx="8"/>
+<text x="90.0" y="66" text-anchor="middle">浏览器</text>
+<text x="90.0" y="80" text-anchor="middle" class="small">input 去抖 300ms</text>
+<rect class="box soft" x="210" y="40" width="160" height="56" rx="8"/>
+<text x="290.0" y="66" text-anchor="middle">SearchView</text>
+<text x="290.0" y="80" text-anchor="middle" class="small">截断 200 字符</text>
+<path class="arrow" d="M160,68 L210,68" marker-end="url(#q11-arr)"/>
+<text x="185" y="34" text-anchor="middle" class="small">GET ?q=</text>
+<rect class="box soft" x="420" y="30" width="170" height="76" rx="8"/>
+<text x="505.0" y="52" text-anchor="middle" font-weight="600">matcher.search()</text>
+<text x="505.0" y="66" text-anchor="middle" class="small">normalize</text>
+<text x="505.0" y="80" text-anchor="middle" class="small">分流</text>
+<text x="505.0" y="94" text-anchor="middle" class="small">三级匹配</text>
+<path class="arrow" d="M370,68 L420,68" marker-end="url(#q11-arr)"/>
+<rect class="box ext" x="650" y="20" width="130" height="46" rx="8"/>
+<text x="715.0" y="40" text-anchor="middle">PartNumber</text>
+<text x="715.0" y="56" text-anchor="middle" class="small">B-tree + GIN</text>
+<rect class="box ext" x="650" y="80" width="130" height="46" rx="8"/>
+<text x="715.0" y="100" text-anchor="middle">Part</text>
+<text x="715.0" y="116" text-anchor="middle" class="small">name_en GIN</text>
+<path class="arrow" d="M590,50 L650,43" marker-end="url(#q11-arr)"/>
+<text x="620" y="30" text-anchor="middle" class="small">①</text>
+<path class="arrow" d="M590,86 L650,103" marker-end="url(#q11-arr)"/>
+<text x="620" y="120" text-anchor="middle" class="small">文本分支</text>
+<rect class="box good" x="420" y="150" width="170" height="56" rx="8"/>
+<text x="505.0" y="176" text-anchor="middle">Candidate[]</text>
+<text x="505.0" y="190" text-anchor="middle" class="small">内存对象，最多 20</text>
+<path class="arrow" d="M505,106 L505,150" marker-end="url(#q11-arr)"/>
+<rect class="box soft" x="650" y="150" width="270" height="56" rx="8"/>
+<text x="785.0" y="176" text-anchor="middle">prefetch_for_cards()</text>
+<text x="785.0" y="190" text-anchor="middle" class="small">编号 ③· 适配 ④· 图片 ⑤· 报价 ⑥</text>
+<path class="arrow" d="M590,178 L650,178" marker-end="url(#q11-arr)"/>
+<text x="785" y="218" text-anchor="middle" class="small">固定 4 条，与结果条数无关</text>
+<rect class="box " x="210" y="250" width="170" height="56" rx="8"/>
+<text x="295.0" y="276" text-anchor="middle">log_text_search()</text>
+<text x="295.0" y="290" text-anchor="middle" class="small">一条 INSERT ②</text>
+<path class="arrow" d="M420,178 L300,178 L300,250" marker-end="url(#q11-arr)" stroke-dasharray="5 4"/>
+<text x="310" y="222" text-anchor="start" class="small">返回前留痕</text>
+<rect class="box soft" x="420" y="250" width="170" height="56" rx="8"/>
+<text x="505.0" y="276" text-anchor="middle">结果区模板</text>
+<text x="505.0" y="290" text-anchor="middle" class="small">part_card.html</text>
+<path class="arrow" d="M505,206 L505,250" marker-end="url(#q11-arr)"/>
+<rect class="box good" x="20" y="250" width="140" height="56" rx="8"/>
+<text x="90.0" y="276" text-anchor="middle" font-weight="600">HTML 片段</text>
+<text x="90.0" y="290" text-anchor="middle" class="small">只替换 #results</text>
+<path class="arrow hi" d="M505,306 L505,330 L90,330 L90,306" marker-end="url(#q11-arrh)"/>
+<rect class="box ext" x="20" y="350" width="900" height="66" rx="6"/>
+<text x="470.0" y="380" text-anchor="middle">查询预算：会话 ⑦ + 用户 ⑧ + 匹配 ①（1–3 条，三级各跑一条）+ 卡片 ③④⑤⑥ + 留痕 ②</text>
+<text x="470.0" y="396" text-anchor="middle" class="small">典型 8 条 · 三级全跑 10 条 · 测试断言 with django_assert_max_num_queries(9)</text>
+</svg>
+<figcaption>图 Q11 · 数据流转与查询预算。圈号是 SQL；卡片数据靠批量预取保持固定条数，所以结果从 1 条变成 20 条，查询数不变。</figcaption>
+</figure>
+<!-- /fig:q11 -->
+<!-- fig:q11 -->
+
+<p>典型情形 <b>8 条</b> SQL（会话、用户、一条匹配查询、四条卡片数据、一条留痕 INSERT）；三级全跑的最坏情形 10 条。测试用 9 条做预算断言，对应"L1 没命中、L2 就填满一页"这个常见组合。关键是卡片数据固定 4 条（编号、适配、图片、报价），<b>与结果条数无关</b>——靠 <code>prefetch_for_cards()</code> 对已经在内存里的候选批量预取实现：</p>
+<pre><code>with django_assert_max_num_queries(9):
+    response = user_client.get(SEARCH, {"q": "88880"})</code></pre>
+<p>还有一个容易被忽略的 N+1：产品卡要显示"制动系统 / 制动气室"这样的分类全名，而 <code>Category.__str__</code> 会读 <code>parent.name</code>。所以 matcher 的每一级查询都带着 <code>select_related("part__category__parent")</code>，测试里的假数据也刻意让分类都有上级——否则这个 N+1 在测试中根本暴露不出来。</p>
+
+<h2 id="s11">11. 匹配能力的复用</h2>
+<p>归一化和匹配写成纯服务而不是视图里的代码，最大的回报是复用：</p>
+
+<!-- fig:q12 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 940 310" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="归一化与匹配服务在系统中的复用关系">
+<defs><marker id="q12-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="q12-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box soft" x="370" y="20" width="200" height="50" rx="8"/>
+<text x="470.0" y="42" text-anchor="middle" font-weight="600">normalize_number()</text>
+<text x="470.0" y="58" text-anchor="middle" class="small">纯函数，无模型依赖</text>
+<rect class="box " x="20" y="110" width="200" height="50" rx="8"/>
+<text x="120.0" y="132" text-anchor="middle">模型 save()</text>
+<text x="120.0" y="148" text-anchor="middle" class="small">入库即算好</text>
+<path class="arrow" d="M470,70 L120,110" marker-end="url(#q12-arr)" stroke-dasharray="5 4"/>
+<rect class="box " x="250" y="110" width="200" height="50" rx="8"/>
+<text x="350.0" y="132" text-anchor="middle">导入服务</text>
+<text x="350.0" y="148" text-anchor="middle" class="small">一格多号先拆</text>
+<path class="arrow" d="M470,70 L350,110" marker-end="url(#q12-arr)" stroke-dasharray="5 4"/>
+<rect class="box soft" x="480" y="110" width="200" height="50" rx="8"/>
+<text x="580.0" y="132" text-anchor="middle" font-weight="600">matcher.search()</text>
+<text x="580.0" y="148" text-anchor="middle" class="small">三级匹配</text>
+<path class="arrow" d="M470,70 L580,110" marker-end="url(#q12-arr)" stroke-dasharray="5 4"/>
+<rect class="box good" x="710" y="110" width="200" height="50" rx="8"/>
+<text x="810.0" y="132" text-anchor="middle" font-weight="600">alternatives()</text>
+<text x="810.0" y="148" text-anchor="middle" class="small">详情页 · 报价单替代件列</text>
+<path class="arrow" d="M470,70 L810,110" marker-end="url(#q12-arr)" stroke-dasharray="5 4"/>
+<rect class="box good" x="330" y="215" width="200" height="50" rx="8"/>
+<text x="430.0" y="238" text-anchor="middle">搜索页</text>
+<text x="430.0" y="252" text-anchor="middle" class="small">文字查询</text>
+<rect class="box good" x="560" y="215" width="260" height="50" rx="8"/>
+<text x="690.0" y="238" text-anchor="middle">图片询价</text>
+<text x="690.0" y="252" text-anchor="middle" class="small">把读到的编号拼成 oe:&lt;号&gt; 再查</text>
+<path class="arrow" d="M430,215 L560,160" marker-end="url(#q12-arr)"/>
+<path class="arrow hi" d="M690,215 L620,160" marker-end="url(#q12-arrh)"/>
+<text x="470" y="292" text-anchor="middle" class="small">视觉模型读出的编号一律回到 search() 检索：库里没有的号，匹配不出任何候选</text>
+</svg>
+<figcaption>图 Q12 · 写成纯服务的回报。归一化被四处共用（写入两处、查询两处），匹配又被搜索页与图片询价共用，替代件复用同一套编号关系。</figcaption>
+</figure>
+<!-- /fig:q12 -->
+<!-- fig:q12 -->
+
+<p>其中<b>图片询价的复用最关键</b>：视觉模型读出照片上的编号后，系统并不相信它，而是把每个编号拼成 <code>oe:&lt;号&gt;</code> 交给同一个 <code>search()</code>。这样图片询价的结果和文字查询同样可解释，也不存在"模型幻觉出一个不存在的编号还被当成结果"的可能——不在库里的号，匹配不出任何候选。</p>
+<p>导入向导则只用 <code>normalize_number()</code>，不走 <code>search()</code>：导入要判断的是"这一行是不是库里已有的产品"，它有更强的依据（SKU、供应商料号），且需要一次性把整批编号建成索引，用逐行模糊匹配既慢又危险。</p>
+
+<h2 id="s12">12. 索引与性能</h2>
+<div class="tbl narrow"><table>
+<tr><th>措施</th><th>作用</th></tr>
+<tr><td><code>PartNumber.number_norm</code> 普通 B-tree 索引</td><td>L1 精确查询，一次索引命中</td></tr>
+<tr><td>同字段的 <b>GIN trigram 索引</b>（<code>gin_trgm_ops</code>）</td><td>L3 的 <code>trigram_similar</code> 预筛；没有它就是全表算分</td></tr>
+<tr><td><code>Part.name_en</code> 的 GIN trigram 索引</td><td>文本检索的错拼回退</td></tr>
+<tr><td>归一化值<b>落库时算好</b>而不是查询时算</td><td>查询能用索引；代价是写入路径必须唯一（模型 <code>save()</code> 与 <code>bulk_create</code> 都覆盖了）</td></tr>
+<tr><td><code>PostgresOnlyAddIndex</code> 自定义迁移操作</td><td>SQLite 上跳过这些索引的建库步骤，同一套迁移两个库都能跑</td></tr>
+<tr><td>各级 SQL 取 <code>limit * 3</code> 行</td><td>留够去重与排序的余量，又不把整表拉进内存</td></tr>
+</table></div>
+
+<h2 id="s13">13. 怎么调阈值</h2>
+<p>阈值不是猜的，调法写在这里供后续维护：</p>
+<ol>
+<li>在 PostgreSQL 上用真实编号量一遍分布：<code>SELECT similarity('20443906', number_norm) ...</code>，看"错一位""错两位""完全不同"三档各自落在哪。</li>
+<li>阈值取"错一位"的下沿——宁可多给候选，也不要漏。漏掉的代价是销售回一句"查不到"，多给的代价只是多看一眼标签。</li>
+<li>换数据集（比如公司真实库以 10 位编号为主）要重新量：<b>编号越长，同样错一位的相似度越高</b>，阈值可以相应提高。</li>
+<li>SQLite 的 difflib 阈值必须单独量，两种算法不可互换。</li>
+</ol>
+
+<h2 id="s14">14. 边界与下一步</h2>
+<div class="tbl narrow"><table>
+<tr><th>现在不做</th><th>什么时候值得做</th></tr>
+<tr><td>向量 / 语义检索（"适合欧曼的前轮刹车片"这类自然语言）</td><td>SKU 过万、文字询盘占比高时，用 pgvector 加一路召回，与现有三级并列而不是替换</td></tr>
+<tr><td>以图搜图（不依赖编号的相似外观检索）</td><td>图片询价占比高、且有足够的标注图之后</td></tr>
+<tr><td>把 L2 与 L3 合并成一条 SQL</td><td>搜索页最坏 9 条查询里有 2 条是分级带来的；如果并发压力上来，可以合并，代价是失去"前缀"与"模糊"两种标签的区分</td></tr>
+<tr><td>拼音检索（"shachepian"）</td><td>国内客户占比上来之后</td></tr>
+<tr><td>按客户历史加权排序</td><td>询价留痕积累到有统计意义时，把"这个客户常买的规格"排前面</td></tr>
+</table></div>
+<p class="meta">相关文档：<a href="architecture.html#s7">架构设计 §7 核心服务</a> · <a href="data-dictionary.html">数据字典（各品牌编号格式）</a> · <a href="manual.html#s4">使用说明 §4（使用者视角）</a> · <a href="prd.html">PRD F3 验收标准</a></p>
+</main>
+<footer class="site">智能搜索详细设计 v1.0 · 演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>
