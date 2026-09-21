@@ -17,3 +17,6 @@ staticfiles/
 .idea/
 .vscode/
 .DS_Store
+
+# 公司提供的面试材料与由其生成的结果：只在本地使用，不进公开仓库
+extra/

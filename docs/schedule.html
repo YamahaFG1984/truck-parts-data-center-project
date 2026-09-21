@@ -12,6 +12,7 @@
   <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
   <nav>
     <a href="index.html">总览</a>
+    <a href="archive-design.html">归档与归一化</a>
     <a href="manual.html">使用说明</a>
     <a href="search-design.html">智能搜索</a>
     <a href="prd.html">PRD</a>
@@ -30,6 +31,7 @@
 <li><a href="#rules">施工规则</a></li>
 <li><a href="#overview">里程碑总览</a></li>
 <li><a href="#milestones">里程碑明细 M01–M20</a></li>
+<li><a href="#phase2">第二阶段 M21–M29：可追溯归档与归一化</a></li>
 <li><a href="#handoff">交接说明：给接手模型</a></li>
 <li><a href="#review">审核流程：给项目作者</a></li>
 </ol></div>
@@ -566,6 +568,191 @@ bash scripts/demo_up.sh      # 全新环境一条命令到可演示
 git commit -am "feat(core): home dashboard, README, demo script (M20)" &amp;&amp; git tag M20</code></pre>
 <h4>审核清单</h4>
 <ul><li>断网 + mock 模式下五个场景仍可走通。</li><li>README 中的命令逐条可复制执行。</li></ul>
+</div></div>
+
+<h2 id="phase2">第二阶段：可追溯归档与归一化（M21–M29）</h2>
+<p>设计与决策见 <a href="archive-design.html">可追溯归档与归一化 · 设计与施工方案</a>。施工规则与第一阶段相同：一个里程碑一次提交、一个标签、一次审核。另有三条硬约束：</p>
+<ul>
+<li><b>不改第一阶段代码</b>：新功能都放在 <code>apps/sources</code> 与 <code>apps/archive</code>；需要复用的函数（如 <code>normalize_number</code>）只调用，不修改。</li>
+<li><b>归一关系只能经 <code>apps/archive/services/review.py</code> 写入</b>：匹配引擎只生成待确认条目，有守卫测试保证除此之外没有代码修改成员关系。</li>
+<li><b>公司资料不进仓库</b>：测试用合成数据复现同样的陷阱模式；<code>extra/</code> 已被忽略。</li>
+</ul>
+<div class="tbl"><table>
+<tr><th>#</th><th>里程碑</th><th>模型</th><th>工时</th><th>依赖</th></tr>
+<tr><td>M21</td><td>sources 数据模型与原件留存</td><td><span class="tag opus">Opus</span></td><td>4h</td><td>M20</td></tr>
+<tr><td>M22</td><td>Excel / CSV 提取与列映射</td><td><span class="tag opus">Opus</span></td><td>8h</td><td>M21</td></tr>
+<tr><td>M23</td><td>PDF 表格提取</td><td><span class="tag opus">Opus</span></td><td>4h</td><td>M22</td></tr>
+<tr><td>M24</td><td>字段标准化与首次入库</td><td><span class="tag opus">Opus</span></td><td>6h</td><td>M22</td></tr>
+<tr><td>M25</td><td>archive 模型与匹配引擎</td><td><span class="tag opus">Opus</span></td><td>8h</td><td>M24</td></tr>
+<tr><td>M26</td><td>人工复核台与回写</td><td><span class="tag opus">Opus</span></td><td>8h</td><td>M25</td></tr>
+<tr><td>M27</td><td>增量导入：版本对比</td><td><span class="tag opus">Opus</span></td><td>4h</td><td>M26</td></tr>
+<tr><td>M28</td><td>档案查询、产品页、三份导出、命令行</td><td><span class="tag codex">Sonnet</span></td><td>8h</td><td>M27</td></tr>
+<tr><td>M29</td><td>交付文档、结果样例、陌生资料演练</td><td><span class="tag codex">Sonnet</span></td><td>4–8h</td><td>全部</td></tr>
+</table></div>
+<p>测试用的合成数据集（<code>apps/archive/tests/fixtures.py</code>，在 M24 建立）必须覆盖以下陷阱，每一类都有断言：共享 OE 但品类不同、共享 OE 但左右不同（含同一文件内）、同适配下尺寸相同但品类不同、名称写法不同实为同件、名称互为子串的不同品类（Housing 与 Housing Cap）、无 OE 仅名称 + 适配 + 尺寸一致、同一供应商内重复、缺价格 / 币种 / MOQ / 适配 / 尺寸、适配缺年份、多币种、单元格格式与币种列矛盾、短编号相似。</p>
+
+<div class="ms" id="m21"><div class="head"><h3>M21 · sources 数据模型与原件留存</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>建立资料层：原件只读留存，来源记录写入后不可修改。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/sources/</code>：<code>apps.py</code>、<code>models.py</code>（<code>SourceFile</code>、<code>SourceRecord</code>、<code>RecordNumber</code>、<code>MappingTemplate</code>，字段见设计文档 §4.1）、<code>admin.py</code>（只读展示）、迁移</li>
+<li><code>services/storage.py</code>：<code>store_upload(file, supplier, user) -&gt; SourceFile</code>，分块计算 sha256，uuid 路径；同一供应商同哈希抛 <code>DuplicateFile</code>（带已有文件 id）</li>
+<li><code>SourceRecord.save()</code> 对已存在的行抛错；<code>RecordNumber</code> 保存时用 <code>normalize_number</code> 计算 number_norm</li>
+<li>测试：留存与哈希；同供应商重复被拒、不同供应商允许；记录不可修改；原件路径不含用户文件名；admin 页可打开</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/sources
+ruff check .
+python manage.py makemigrations --check --dry-run
+git commit -m "feat(sources): source files and immutable source records (M21)" &amp;&amp; git tag M21</code></pre>
+<h4>审核清单</h4>
+<ul><li>不可修改由模型层保证，而不是只靠界面不给入口。</li><li>SourceRecord 的定位字段能同时表达 Excel（sheet、row）与 PDF（page、table、row）。</li></ul>
+</div></div>
+
+<div class="ms" id="m22"><div class="head"><h3>M22 · Excel / CSV 提取与列映射</h3><span class="tag opus">Opus</span><span class="tag">8h</span><span class="tag">≤ 400 行</span></div><div class="body">
+<h4>目标</h4><p>读出每个单元格的值、坐标和数字格式；列映射依次尝试供应商模板、同义词、大模型建议，最后由人确认并保存为模板。</p>
+<h4>文件</h4>
+<ul>
+<li><code>services/readers.py</code>：<code>read_workbook</code>（openpyxl，逐工作表定位表头，跳过空表与空行；单元格返回值、原文、坐标、number_format）、<code>read_csv</code>（行号定位）。不经 pandas——需要坐标与格式</li>
+<li><code>services/mapping.py</code>：标准字段 record_id、supplier_sku、oe_numbers、name、category、fitment、position、dims、price、currency、moq、quote_date、ignore；同义词覆盖常见北美目录表头（Source Record ID / Source Ref、Supplier SKU / Brand Number、Truck Application / Fitment、Position / Install Side、OE / Reference / Cross Ref、Package Size / Package、Unit Price / Offer Price、Currency / Curr.、MOQ / Min Order、Quote Date / Quoted On 等）；按表头签名命中供应商模板</li>
+<li><code>apps/ai/prompts/archive_column_mapping.md</code> 与 <code>.example.json</code>：只送表头与三行样例；调用经 <code>get_client()</code></li>
+<li><code>views.py</code> 与模板：上传页（选供应商）→ 映射确认页（每列：样例、建议字段、来源、置信度，可改）；确认后保存模板</li>
+<li>测试：两套完全不同的表头都能映射；工作表名与单元格坐标正确；数值单元格取值而不是显示格式；模板命中；大模型失败时该列为"忽略"并提示</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/sources
+ruff check .
+python manage.py runserver   # 上传一份 xlsx → 映射确认页 → 保存
+git commit -m "feat(sources): workbook reader with cell lineage and column mapping (M22)" &amp;&amp; git tag M22</code></pre>
+<h4>审核清单</h4>
+<ul><li>未经人确认的映射不能进入下一步。</li><li>大模型只看到表头和三行样例。</li></ul>
+</div></div>
+
+<div class="ms" id="m23"><div class="head"><h3>M23 · PDF 表格提取</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 250 行</span></div><div class="body">
+<h4>目标</h4><p>PDF 与 Excel 走同一套映射与后续流程，定位写"页 / 表 / 行 / 列"。</p>
+<h4>文件</h4>
+<ul>
+<li><code>requirements/base.txt</code> 增加 <code>pdfplumber</code></li>
+<li><code>services/readers.py</code>：<code>read_pdf</code>，先用线条策略、再用文本对齐策略抽表；跨页续表且没有表头时继承上一页表头；没有可识别的表格时抛 <code>NoTableFound</code>，文件标为失败并写明原因</li>
+<li><code>apps/sources/tests/pdfgen.py</code>：不依赖第三方库的最小 PDF 生成器（画表格线与文字），测试现场生成样本</li>
+<li>测试：带线表格；跨页续表；无表格 PDF 的失败信息；PDF 与同内容 xlsx 提取出相同字段</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pip install -r requirements/local.txt
+pytest -q apps/sources
+ruff check .
+git commit -m "feat(sources): PDF table extraction with page locators (M23)" &amp;&amp; git tag M23</code></pre>
+<h4>审核清单</h4>
+<ul><li>解析失败时原件仍在，状态与原因可见。</li><li>页码从 1 开始，与阅读器显示一致。</li></ul>
+</div></div>
+
+<div class="ms" id="m24"><div class="head"><h3>M24 · 字段标准化与首次入库</h3><span class="tag opus">Opus</span><span class="tag">6h</span><span class="tag">≤ 400 行</span></div><div class="body">
+<h4>目标</h4><p>每个字段带着原文、单元格、规则、警告被标准化；预检列出每行结果与缺失项；人确认后在一个事务里写入 SourceRecord。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/sources/rules/vocabulary.json</code>：品类词表（规范名 → 别名）、位置词、北美品牌别名、尺寸单位</li>
+<li><code>services/standardize.py</code>：品类与位置（最长匹配，先剥离位置词；位置列优先，与名称矛盾时警告）、适配（品牌 / 车型 / 年份，缺年份时标"不完整"）、尺寸（L×W×H 与单位换算到 cm）、价格（取数值；单元格格式与币种列矛盾时警告；<b>有价无币种不默认 USD</b>）、MOQ、报价日期；输出 fields、类型化字段、missing</li>
+<li><code>services/ingest.py</code>：<code>preview(source_file)</code>、<code>commit(source_file, user)</code>（一个事务；record_key 取源记录 ID → 料号 → 内容哈希）</li>
+<li>预检页：逐行结果、警告、缺失；"入库"按钮</li>
+<li><code>apps/archive/tests/fixtures.py</code>：合成两家供应商的数据集，覆盖上面列出的全部陷阱</li>
+<li>测试：参数化覆盖各种写法；每个字段都有出处；事务回滚</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/sources
+ruff check .
+git commit -m "feat(sources): field standardization with lineage and first ingest (M24)" &amp;&amp; git tag M24</code></pre>
+<h4>审核清单</h4>
+<ul><li>"Air Filter Housing Cap" 不会被识别成 Housing。</li><li>没有任何默认值是凭空补上的。</li></ul>
+</div></div>
+
+<div class="ms" id="m25"><div class="head"><h3>M25 · archive 模型与匹配引擎</h3><span class="tag opus">Opus</span><span class="tag">8h</span><span class="tag">≤ 400 行</span></div><div class="body">
+<h4>目标</h4><p>归一层模型；每条新记录自成"待核"产品；匹配引擎按设计文档图 R3 生成待确认条目，<b>不合并任何东西</b>。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/archive/</code>：<code>models.py</code>（<code>Product</code>、<code>Membership</code>、<code>ReviewItem</code>、<code>FieldChoice</code>、<code>DecisionLog</code>）、<code>admin.py</code>、迁移</li>
+<li><code>apps/archive/rules/matching.json</code>：关键字段、尺寸容差、召回用编号最小长度、各类别的建议动作文案、规则版本号</li>
+<li><code>services/matching.py</code>：召回（共享编号、同品类同车型、同源）、判定（品类 → 位置 → 缺失 → 适配尺寸 → 共享编号 → 同源）、证据整理（triggers、agreements、conflicts 带两边取值与出处、missing、suggested_action、strength、evidence_hash）</li>
+<li><code>management/commands/archive_rematch.py</code>：只重建未决条目</li>
+<li>入库后自动为新记录建单成员产品并跑匹配</li>
+<li>测试：用合成数据集逐类断言类别、冲突字段、缺失字段、建议动作；<b>匹配前后产品数不变</b>；重跑幂等；品类不同或左右不同且无共享编号时不成对</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/archive apps/sources
+ruff check .
+python manage.py makemigrations --check --dry-run
+git commit -m "feat(archive): products, review items and matching engine (M25)" &amp;&amp; git tag M25</code></pre>
+<h4>审核清单</h4>
+<ul><li>任何代码路径都不会因为匹配而合并产品。</li><li>evidence_hash 只由关键字段计算，与条目顺序无关。</li></ul>
+</div></div>
+
+<div class="ms" id="m26"><div class="head"><h3>M26 · 人工复核台与回写</h3><span class="tag opus">Opus</span><span class="tag">8h</span><span class="tag">≤ 400 行</span></div><div class="body">
+<h4>目标</h4><p>人在这里做全部归一决定；每个决定写审计日志，可撤销，下次导入自动沿用。</p>
+<h4>文件</h4>
+<ul>
+<li><code>services/review.py</code>：<code>confirm_same</code>、<code>mark_different</code>、<code>confirm_independent</code>、<code>mark_needs_info</code>、<code>detach</code>（移出）、<code>choose_value</code>；每个动作写 DecisionLog；这是<b>唯一</b>修改 Membership / Product 归属的入口</li>
+<li>视图与模板：待确认队列（按类别、强度、供应商筛选）、左右对照页（冲突标红、缺失标黄、每个值带出处）、强证据条目勾选后批量确认</li>
+<li>测试：每个动作对产品与成员的影响；移出后恢复待核；批量确认只接受强证据条目；决策复用（证据不变不再问、证据变了重开）；<b>守卫测试</b>：review.py 之外没有代码修改成员归属</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/archive
+ruff check .
+python manage.py runserver   # 队列 → 对照页 → 确认 / 判不同 / 移出
+git commit -m "feat(archive): human review queue and write-back (M26)" &amp;&amp; git tag M26</code></pre>
+<h4>审核清单</h4>
+<ul><li>批量确认也逐条写审计日志。</li><li>判为不同的一对，证据不变时不会再次出现。</li></ul>
+</div></div>
+
+<div class="ms" id="m27"><div class="head"><h3>M27 · 增量导入：版本对比</h3><span class="tag opus">Opus</span><span class="tag">4h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>同一供应商的新文件进来，逐行分出新增、未变、报价更新、关键字段变化、本次未出现，并给出字段级差异。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/sources/services/ingest.py</code>：预检中与该供应商当前版本对比；入库时建版本链</li>
+<li><code>apps/archive/services/matching.py</code>：报价更新时成员关系延续；关键字段变化时暂停成员并生成 key_change 条目；只对新增和变化的记录重新匹配</li>
+<li>预检页显示旧值 → 新值</li>
+<li>测试：同一文件二次导入（被哈希拦下）；改价格的新文件 → 报价更新且归一保持；改位置 → 暂停 + 条目；删掉一行 → 本次未出现；record_key 回退到内容哈希时的警告</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/sources apps/archive
+ruff check .
+git commit -m "feat(sources): incremental import with version diff (M27)" &amp;&amp; git tag M27</code></pre>
+<h4>审核清单</h4>
+<ul><li>旧版本记录一行都没被改动。</li><li>"本次未出现"只提示，不删除。</li></ul>
+</div></div>
+
+<div class="ms" id="m28"><div class="head"><h3>M28 · 档案查询、产品页、三份导出与命令行</h3><span class="tag codex">Sonnet</span><span class="tag">8h</span><span class="tag">≤ 400 行</span></div><div class="body">
+<h4>目标</h4><p>按任一编号、关键词、品牌、供应商查；产品页带出处；导出主数据、供应商报价、待人工确认清单。</p>
+<h4>文件</h4>
+<ul>
+<li><code>apps/archive/services/search.py</code>：编号走 <code>RecordNumber.number_norm</code>（复用 <code>normalize_number</code> 与分级匹配思路），关键词查名称、品类、车型，品牌查适配品牌，供应商查供应商名；结果按产品聚合并标出命中字段</li>
+<li>产品页（汇总属性、冲突、成员报价表、出处弹层、相关条目、决策历史）；来源记录页（整行原文、字段出处）；原件下载</li>
+<li><code>services/export.py</code>：三份 xlsx，列见设计文档 §11；币种原样</li>
+<li><code>management/commands/archive_import.py</code>（文件 + 供应商 + 映射模板，非交互）、<code>archive_export.py</code></li>
+<li>测试：四种查询各一；导出列与行数；出处列可定位到文件、工作表 / 页、行</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q apps/archive
+ruff check .
+python manage.py archive_export --out /tmp/archive-export
+git commit -m "feat(archive): search, product page, exports and commands (M28)" &amp;&amp; git tag M28</code></pre>
+<h4>审核清单</h4>
+<ul><li>导出里的每一行都能追到原件的一行。</li><li>不同币种的报价没有被加总或比较。</li></ul>
+</div></div>
+
+<div class="ms" id="m29"><div class="head"><h3>M29 · 交付文档、结果样例、陌生资料演练</h3><span class="tag codex">Sonnet</span><span class="tag">4–8h</span><span class="tag">≤ 300 行</span></div><div class="body">
+<h4>目标</h4><p>交付物齐全，现场拿到没见过的资料也能跑通。</p>
+<h4>文件</h4>
+<ul>
+<li><code>docs/archive-guide.html</code>：给评审看的简短说明——数据模型、处理流程、匹配规则、复核机制、自动与人工的分界、维护方式（增量导入、规则调整、人工确认回写）</li>
+<li><code>scripts/archive_demo.sh</code>：空库 → 导入两份资料 → 匹配 → 导出三份结果到指定目录（公司样例输出到 <code>extra/output/</code>，不进仓库）</li>
+<li>合成"陌生资料"：不同列名的 xlsx、一份 PDF、一份含价格与位置变化的更新文件；演练清单写进 <code>docs/DEMO_SCRIPT.md</code> 的第二阶段一节</li>
+<li>README 增加第二阶段说明</li>
+</ul>
+<h4>验收</h4>
+<pre><code>pytest -q &amp;&amp; ruff check .
+bash scripts/archive_demo.sh   # 空库一条命令产出三份导出
+git commit -m "docs(archive): delivery guide, demo script and rehearsal (M29)" &amp;&amp; git tag M29</code></pre>
+<h4>审核清单</h4>
+<ul><li>说明文档能回答"哪些自动、哪些人工、疑似同一的依据、如何留存出处、如何持续维护"。</li><li>陌生资料演练中每一处人工步骤都有明确入口。</li></ul>
 </div></div>
 
 <h2 id="handoff">交接说明：给接手模型</h2>

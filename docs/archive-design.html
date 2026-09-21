@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>可追溯归档与归一化 · 卡车配件 AI 产品数据中心</title>
+<meta name="description" content="第二阶段设计与施工方案：供应商资料的可追溯归档、字段级出处、人工确认的产品归一、增量导入与三份导出。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a class="active" href="archive-design.html">归档与归一化</a>
+    <a href="manual.html">使用说明</a>
+    <a href="search-design.html">智能搜索</a>
+    <a href="prd.html">PRD</a>
+    <a href="architecture.html">架构设计</a>
+    <a href="data-dictionary.html">数据字典</a>
+    <a href="schedule.html">施工进度</a>
+    <a href="pitch.html">面试陈述</a>
+  </nav>
+</div></header>
+<main>
+<h1>可追溯归档与归一化 · 设计与施工方案</h1>
+<p class="lede">第二阶段。把不同供应商、格式各异的零件资料（Excel、CSV、PDF）整理成可查询、可核对、可导出的产品档案：原件永不覆盖，每个字段都能回看出处，"是不是同一个产品"一律由人决定，新资料进来能分清新增、更新与冲突。</p>
+<p class="meta">版本 v1.0 · 2026-09-21 · 里程碑 M21–M29 · 新增 app：<code>apps/sources</code>、<code>apps/archive</code></p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#s1">需求要点</a></li>
+<li><a href="#s2">现有系统为什么不能直接用</a></li>
+<li><a href="#s3">已定决策</a></li>
+<li><a href="#s4">三层数据模型</a></li>
+<li><a href="#s5">处理流程</a></li>
+<li><a href="#s6">字段出处</a></li>
+<li><a href="#s7">字段标准化</a></li>
+<li><a href="#s8">匹配规则</a></li>
+<li><a href="#s9">人工复核与回写</a></li>
+<li><a href="#s10">增量导入</a></li>
+<li><a href="#s11">查询与三份导出</a></li>
+<li><a href="#s12">自动与人工的分界</a></li>
+<li><a href="#s13">后续维护</a></li>
+<li><a href="#s14">施工计划 M21–M29</a></li>
+<li><a href="#s15">风险与不做的事</a></li>
+</ol></div>
+
+<h2 id="s1">1. 需求要点</h2>
+<p>业务场景是北美重卡售后件：同一种零件在不同供应商、品牌、目录里编号、名称、描述都不同；反过来，编号相似的两条记录也可能是不同品类、不同车型、不同安装位置或不同规格。需要一套可靠的产品档案，满足五件事：</p>
+<div class="tbl narrow"><table>
+<tr><th>#</th><th>能力</th><th>验收时要看到的</th></tr>
+<tr><td>1</td><td>导入与提取</td><td>编号（原始号、品牌/供应商号）、名称、品类、关键规格与适配、供应商、报价、币种、MOQ、报价日期；每条都带原始文件与工作表/页码/行号。<b>原件不可被覆盖。</b></td></tr>
+<tr><td>2</td><td>识别疑似同一产品</td><td>分为<b>已确认归一</b>、<b>疑似重复</b>、<b>独立产品 / 待补充</b>三类；疑似项写明触发原因、冲突字段、缺失信息、建议人工动作。<b>不能仅凭短编号、尺寸相同、名称相似或共同 OE 号合并。</b></td></tr>
+<tr><td>3</td><td>来源可查、报价分家</td><td>每项信息能看到原始来源；同一产品不同供应商的报价分别保留。</td></tr>
+<tr><td>4</td><td>查询与导出</td><td>按任一编号、关键词、品牌、供应商查询；在归一产品下看到各品牌号、属性、各家资料与报价；看到字段级或记录级来源；导出主数据、供应商报价、待人工确认清单。</td></tr>
+<tr><td>5</td><td>增量</td><td>加一份新资料，能识别新增、更新、冲突与待确认。</td></tr>
+</table></div>
+<p>交付物除了能跑的 Demo，还有：简短说明（数据模型、流程、匹配规则、复核机制）、一份处理结果样例与异常 / 待确认清单、后续维护说明。演示时会拿一份没见过的同类资料现场跑。</p>
+
+<h2 id="s2">2. 现有系统为什么不能直接用</h2>
+<p>第一阶段（M01–M20）的导入器是为"把供应商资料并进产品库"设计的。拿样例资料实际跑了一遍，结果如下：</p>
+<div class="tbl"><table>
+<tr><th>现象</th><th>根因</th><th>违背的要求</th></tr>
+<tr><td>共享一个 OE 号的两条记录被直接合并——包括品类不同（格栅与防虫网）、左右不同的陷阱对</td><td>导入判定树的规则是"编号已在库 → 更新该产品"</td><td>不能仅凭共同 OE 合并</td></tr>
+<tr><td>同一文件里两条共用 OE、左右不同的记录，后一条被判为"与前一行同一产品"并跳过</td><td>文件内按编号去重</td><td>冲突必须交人，不能吞掉</td></tr>
+<tr><td>EUR、GBP 报价全部丢弃，提示"需要汇率，未导入"</td><td>第一阶段约定 USD 单币种</td><td>保留币种；各家报价分别保留</td></tr>
+<tr><td>第二家供应商的名称、适配、尺寸只用来"补空白"，自己的写法没有留下</td><td>数据直接写进产品主表，没有来源层</td><td>原件不可覆盖；每条信息可回看出处</td></tr>
+<tr><td>"左 / 右"列被映射为"忽略"</td><td>模型里没有安装位置字段</td><td>位置是区分左右件的关键规格</td></tr>
+<tr><td>无 OE 但名称、适配、尺寸都相同的记录各建各的，没有任何疑似提示</td><td>重复检测只有"同一 OE 挂多个 SKU"一条规则</td><td>要识别疑似重复并说明原因</td></tr>
+<tr><td>供应商的行号被当成我方 SKU，报价日期被忽略</td><td>标准字段里没有"源记录 ID""报价日期"</td><td>要保存定位信息与报价日期</td></tr>
+</table></div>
+<p>结论：<b>不在旧导入器上打补丁</b>，而是新增两个 app，建立"来源层 → 归一层"的结构；第一阶段的产品库、搜索、询价、报价功能保持不变，作为"类似项目"附带演示。可复用的部分：项目骨架与 CI、编号归一化与品牌别名、导入向导的交互模式、列映射的同义词与大模型回退、复核台的交互模式、Excel 读写、测试基建、文档配图脚本。</p>
+
+<h2 id="s3">3. 已定决策（2026-09-21）</h2>
+<div class="tbl narrow"><table>
+<tr><th>事项</th><th>决定</th><th>落地</th></tr>
+<tr><td>实现方式</td><td>在现项目内新增 app</td><td><code>apps/sources</code>（资料与出处）、<code>apps/archive</code>（归一档案与复核）；不改动第一阶段代码</td></tr>
+<tr><td>自动归一</td><td><b>一律交人工</b></td><td>系统只产出"待确认条目"，任何合并都来自人的操作；强证据条目允许勾选后批量确认，但仍需人点</td></tr>
+<tr><td>PDF</td><td>现在就做</td><td>新增依赖 <code>pdfplumber</code>；测试用的 PDF 由测试代码现场生成，不引入 PDF 写入库</td></tr>
+<tr><td>范围</td><td>不砍</td><td>M21–M29 全部完成</td></tr>
+<tr><td>公司提供的资料</td><td>不进仓库</td><td><code>extra/</code> 已加入 <code>.gitignore</code>；测试用合成数据复现同样的陷阱模式；结果样例生成到本地</td></tr>
+<tr><td>币种</td><td>保留原币种，不做换算</td><td>替代第一阶段"USD 单币种"约定（仅对新 app）；不同币种的报价不做比较</td></tr>
+</table></div>
+
+<h2 id="s4">4. 三层数据模型</h2>
+<p>核心思路是把"<b>资料说了什么</b>"和"<b>我们认为它是什么</b>"彻底分开：前者只增不改，后者每一次变化都来自人的决定并留痕。</p>
+
+<!-- fig:r1 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="原件、资料层、归一层三层数据模型及其关系">
+<defs><marker id="r1-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="r1-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="lane" x="10" y="10" width="220" height="340" rx="10"/>
+<text x="22" y="28" class="lane-label">原件（只读）</text>
+<rect class="lane" x="245" y="10" width="320" height="340" rx="10"/>
+<text x="257" y="28" class="lane-label">资料层 apps/sources · 只增不改</text>
+<rect class="lane" x="580" y="10" width="370" height="340" rx="10"/>
+<text x="592" y="28" class="lane-label">归一层 apps/archive · 每次变化都来自人</text>
+<rect class="box ext" x="30" y="80" width="180" height="96" rx="8"/>
+<text x="120.0" y="112" text-anchor="middle" font-weight="600">SourceFile</text>
+<text x="120.0" y="126" text-anchor="middle" class="small">sha256 · 原文件名</text>
+<text x="120.0" y="140" text-anchor="middle" class="small">xlsx / csv / pdf</text>
+<text x="120.0" y="154" text-anchor="middle" class="small">解析失败也保留原件</text>
+<rect class="box ext" x="30" y="230" width="180" height="50" rx="8"/>
+<text x="120.0" y="252" text-anchor="middle">Supplier</text>
+<text x="120.0" y="268" text-anchor="middle" class="small">第一阶段已有</text>
+<rect class="box soft" x="265" y="60" width="280" height="124" rx="8"/>
+<text x="405.0" y="98" text-anchor="middle" font-weight="600">SourceRecord</text>
+<text x="405.0" y="114" text-anchor="middle" class="small">record_key · version · previous（版本链）</text>
+<text x="405.0" y="128" text-anchor="middle" class="small">定位 sheet / row / page / table</text>
+<text x="405.0" y="142" text-anchor="middle" class="small">raw · cells · fields（字段出处）</text>
+<text x="405.0" y="156" text-anchor="middle" class="small">品类 位置 适配 尺寸 价格 币种…</text>
+<path class="arrow" d="M210,128 L265,128" marker-end="url(#r1-arr)"/>
+<text x="237" y="120" text-anchor="middle" class="small">1 : N</text>
+<path class="arrow" d="M545,88 L558,88 L558,150 L545,150" marker-end="url(#r1-arr)" stroke-dasharray="5 4"/>
+<rect class="box " x="265" y="220" width="130" height="60" rx="8"/>
+<text x="330.0" y="240" text-anchor="middle">RecordNumber</text>
+<text x="330.0" y="256" text-anchor="middle" class="small">料号 · OE · 源 ID</text>
+<text x="330.0" y="270" text-anchor="middle" class="small">number_norm</text>
+<path class="arrow" d="M330,184 L330,220" marker-end="url(#r1-arr)"/>
+<rect class="box " x="415" y="220" width="130" height="60" rx="8"/>
+<text x="480.0" y="248" text-anchor="middle">MappingTemplate</text>
+<text x="480.0" y="262" text-anchor="middle" class="small">供应商列映射模板</text>
+<path class="arrow" d="M120,280 L120,310 L480,310 L480,280" marker-end="url(#r1-arr)"/>
+<text x="300" y="326" text-anchor="middle" class="small">确认一次，下次复用</text>
+<rect class="box good" x="600" y="60" width="170" height="72" rx="8"/>
+<text x="685.0" y="86" text-anchor="middle" font-weight="600">Product</text>
+<text x="685.0" y="102" text-anchor="middle" class="small">P-00001</text>
+<text x="685.0" y="116" text-anchor="middle" class="small">待核 / 已确认归一 / 已确认独立</text>
+<rect class="box good" x="600" y="168" width="170" height="66" rx="8"/>
+<text x="685.0" y="184" text-anchor="middle">Membership</text>
+<text x="685.0" y="200" text-anchor="middle" class="small">供应商 + record_key</text>
+<text x="685.0" y="214" text-anchor="middle" class="small">current_record → 最新版本</text>
+<text x="685.0" y="228" text-anchor="middle" class="small">有效 / 暂停</text>
+<path class="arrow" d="M685,168 L685,132" marker-end="url(#r1-arr)"/>
+<path class="arrow" d="M600,201 L545,160" marker-end="url(#r1-arr)"/>
+<rect class="box dec" x="790" y="60" width="150" height="124" rx="8"/>
+<text x="865.0" y="98" text-anchor="middle" font-weight="600">ReviewItem</text>
+<text x="865.0" y="114" text-anchor="middle" class="small">record_a / record_b</text>
+<text x="865.0" y="128" text-anchor="middle" class="small">触发原因 · 冲突 · 缺失</text>
+<text x="865.0" y="142" text-anchor="middle" class="small">建议动作</text>
+<text x="865.0" y="156" text-anchor="middle" class="small">evidence_hash</text>
+<path class="arrow" d="M865,60 L865,44 L405,44 L405,60" marker-end="url(#r1-arr)"/>
+<rect class="box " x="790" y="220" width="150" height="62" rx="8"/>
+<text x="865.0" y="242" text-anchor="middle">DecisionLog</text>
+<text x="865.0" y="256" text-anchor="middle" class="small">谁 · 何时 · 为什么</text>
+<text x="865.0" y="270" text-anchor="middle" class="small">只增不删</text>
+<path class="arrow" d="M865,220 L865,184" marker-end="url(#r1-arr)"/>
+<rect class="box " x="600" y="268" width="170" height="50" rx="8"/>
+<text x="685.0" y="290" text-anchor="middle">FieldChoice</text>
+<text x="685.0" y="306" text-anchor="middle" class="small">冲突字段由人选值</text>
+<path class="arrow" d="M770,293 L780,293 L780,96 L770,96" marker-end="url(#r1-arr)" stroke-dasharray="5 4"/>
+<rect class="box ext" x="10" y="366" width="555" height="40" rx="6"/>
+<text x="287.5" y="390" text-anchor="middle">左边：资料说了什么——写入后不再修改，更新即新版本</text>
+<rect class="box ext" x="580" y="366" width="370" height="40" rx="6"/>
+<text x="765.0" y="390" text-anchor="middle">右边：我们认为它是什么——只因人的决定而变</text>
+</svg>
+<figcaption>图 R1 · 三层数据模型。原件与资料层只增不改；归一层的每一次变化都能在 DecisionLog 里找到是谁、为什么。成员关系挂在"供应商 + 记录身份"上，所以供应商更新报价不会打散已确认的归一。</figcaption>
+</figure>
+<!-- /fig:r1 -->
+<!-- fig:r1 -->
+
+<h3>4.1 apps/sources：资料与出处（只增不改）</h3>
+<div class="tbl"><table>
+<tr><th>模型</th><th>关键字段</th><th>说明</th></tr>
+<tr><td><code>SourceFile</code></td><td>supplier、file（uuid 路径）、original_name、<b>sha256</b>、format（xlsx / csv / pdf）、status、mapping、stats、error</td><td>原件存档。同一供应商上传哈希相同的文件，提示"已导入过 #N"并拒绝重复入库。解析失败也保留原件与失败原因。</td></tr>
+<tr><td><code>SourceRecord</code></td><td>source_file、supplier、<b>record_key</b>、version、previous、change_type、is_current；定位：sheet、row_no、page、table_no；<b>raw</b>（原表头 → 原文）、<b>cells</b>（原表头 → 单元格坐标）、<b>fields</b>（标准字段 → 值 / 原文 / 列 / 单元格 / 规则 / 警告）、warnings；常用字段的类型化副本：supplier_sku、name、part_type、position、make、model、year_from、year_to、dims、price、currency、moq、quote_date</td><td>资料里的一行。<b>写入后不再修改</b>；供应商再发同一条记录时新建一个版本，以 previous 串成版本链。</td></tr>
+<tr><td><code>RecordNumber</code></td><td>record、kind（supplier_sku / oe / source_id）、number、number_norm</td><td>编号索引，复用第一阶段的 <code>normalize_number()</code>，供查询与召回使用。</td></tr>
+<tr><td><code>MappingTemplate</code></td><td>supplier、header_signature、columns、confirmed_by</td><td>人工确认过的列映射。同一供应商下次来同样表头的文件时直接套用。</td></tr>
+</table></div>
+<h3>4.2 apps/archive：归一档案（每次变化都来自人）</h3>
+<div class="tbl"><table>
+<tr><th>模型</th><th>关键字段</th><th>说明</th></tr>
+<tr><td><code>Product</code></td><td>code（P-00001）、status（<b>待核</b> / 已确认归一 / 已确认独立）、needs_info、missing_fields、note</td><td>归一产品。每条新记录先自成一个"待核"单成员产品；合并、拆分都靠人。展示用的属性由成员记录实时汇总，成员之间有分歧时标为冲突。</td></tr>
+<tr><td><code>Membership</code></td><td>product、supplier、<b>record_key</b>、current_record、status（有效 / 暂停）、joined_by、decision</td><td>"某供应商的某条记录属于某产品"。挂在记录身份上而不是某个版本上，所以供应商更新报价后成员关系自动延续。</td></tr>
+<tr><td><code>ReviewItem</code></td><td>kind、category、record_a、record_b、triggers、agreements、<b>conflicts</b>、<b>missing</b>、<b>suggested_action</b>、strength、<b>evidence_hash</b>、rules_version、status、decided_by / at、note</td><td>待确认条目：疑似同一产品、信息不足、关键字段变化、同源重复等。每条都写明为什么出现、哪里冲突、缺什么、建议怎么做。</td></tr>
+<tr><td><code>FieldChoice</code></td><td>product、field、record、value、chosen_by、reason</td><td>成员之间取值冲突时，由人选定展示值，并记下依据。</td></tr>
+<tr><td><code>DecisionLog</code></td><td>action、actor、at、payload、review_item</td><td>审计日志：合并、判为不同、确认独立、标记待补充、移出、选值。只增不删。</td></tr>
+</table></div>
+
+<h2 id="s5">5. 处理流程</h2>
+
+<!-- fig:r2 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="从上传到导出的九步处理流程，标出人工参与的步骤">
+<defs><marker id="r2-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="r2-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box soft" x="20" y="40" width="168" height="60" rx="8"/>
+<text x="104.0" y="68" text-anchor="middle" font-weight="600">① 上传留存</text>
+<text x="104.0" y="82" text-anchor="middle" class="small">sha256 · uuid 路径</text>
+<path class="arrow" d="M188,70 L208,70" marker-end="url(#r2-arr)"/>
+<rect class="box soft" x="208" y="40" width="168" height="60" rx="8"/>
+<text x="292.0" y="68" text-anchor="middle" font-weight="600">② 解析定位</text>
+<text x="292.0" y="82" text-anchor="middle" class="small">Excel 单元格 · PDF 页表行</text>
+<path class="arrow" d="M376,70 L396,70" marker-end="url(#r2-arr)"/>
+<rect class="box dec" x="396" y="40" width="168" height="60" rx="8"/>
+<text x="480.0" y="68" text-anchor="middle" font-weight="600">③ 列映射</text>
+<text x="480.0" y="82" text-anchor="middle" class="small">模板 → 同义词 → AI → 人</text>
+<path class="arrow" d="M564,70 L584,70" marker-end="url(#r2-arr)"/>
+<rect class="box soft" x="584" y="40" width="168" height="60" rx="8"/>
+<text x="668.0" y="68" text-anchor="middle" font-weight="600">④ 标准化</text>
+<text x="668.0" y="82" text-anchor="middle" class="small">每个字段带出处与警告</text>
+<path class="arrow" d="M752,70 L772,70" marker-end="url(#r2-arr)"/>
+<rect class="box soft" x="772" y="40" width="168" height="60" rx="8"/>
+<text x="856.0" y="68" text-anchor="middle" font-weight="600">⑤ 预检</text>
+<text x="856.0" y="82" text-anchor="middle" class="small">版本对比，不写库</text>
+<rect class="box dec" x="20" y="190" width="212" height="60" rx="8"/>
+<text x="126.0" y="218" text-anchor="middle" font-weight="600">⑥ 入库</text>
+<text x="126.0" y="232" text-anchor="middle" class="small">人确认后一个事务</text>
+<path class="arrow" d="M232,220 L256,220" marker-end="url(#r2-arr)"/>
+<rect class="box soft" x="256" y="190" width="212" height="60" rx="8"/>
+<text x="362.0" y="218" text-anchor="middle" font-weight="600">⑦ 匹配</text>
+<text x="362.0" y="232" text-anchor="middle" class="small">召回 · 比对 · 不改产品</text>
+<path class="arrow" d="M468,220 L492,220" marker-end="url(#r2-arr)"/>
+<rect class="box dec" x="492" y="190" width="212" height="60" rx="8"/>
+<text x="598.0" y="218" text-anchor="middle" font-weight="600">⑧ 人工复核</text>
+<text x="598.0" y="232" text-anchor="middle" class="small">合并 · 判不同 · 待补充 · 移出</text>
+<path class="arrow" d="M704,220 L728,220" marker-end="url(#r2-arr)"/>
+<rect class="box good" x="728" y="190" width="212" height="60" rx="8"/>
+<text x="834.0" y="218" text-anchor="middle" font-weight="600">⑨ 查询与导出</text>
+<text x="834.0" y="232" text-anchor="middle" class="small">产品页带出处 · 三份 xlsx</text>
+<path class="arrow" d="M846,100 L846,140 L126,140 L126,190" marker-end="url(#r2-arr)"/>
+<path class="arrow" d="M682,250 L682,280 L362,280 L362,250" marker-end="url(#r2-arr)" stroke-dasharray="5 4"/>
+<text x="522" y="298" text-anchor="middle" class="small">证据变化 / 规则调整 → 重新匹配</text>
+<rect class="box dec" x="20" y="306" width="14" height="14" rx="3"/>
+<text x="40" y="317" text-anchor="start" class="legend">黄色：需要人参与的步骤</text>
+<text x="260" y="317" text-anchor="start" class="legend">失败不丢原件：解析失败的文件保留原件与原因</text>
+</svg>
+<figcaption>图 R2 · 处理流程。系统负责留存、解析、标准化、对比和把证据摆清楚；映射确认、入库确认、归一决定都要人来做。</figcaption>
+</figure>
+<!-- /fig:r2 -->
+<!-- fig:r2 -->
+
+<ol>
+<li><b>上传与留存</b>：计算 sha256，按 uuid 路径存原件，原文件名另存；同一供应商同哈希拒绝重复入库。</li>
+<li><b>解析</b>：Excel 逐工作表定位表头，逐单元格读取值与坐标，保留单元格的数字格式；CSV 按行号定位；PDF 逐页抽表，定位写"页 / 表 / 行"。无法识别表格时，文件状态记为失败并写明原因，原件仍保留。</li>
+<li><b>列映射</b>：依次尝试该供应商的模板、同义词表、大模型建议，最后由人逐列确认；确认后保存为该供应商的模板。</li>
+<li><b>标准化</b>：见 <a href="#s7">§7</a>，每个字段都记录原文、单元格、所用规则和警告。</li>
+<li><b>预检（不写库）</b>：与该供应商已有记录做版本对比，列出新增、未变、报价更新、关键字段变化、本次未出现，以及信息缺失清单。</li>
+<li><b>入库（一个事务）</b>：写入 SourceRecord 版本链；新记录自成"待核"产品；只有报价变化时，成员关系延续；关键字段变化时，暂停成员关系并生成复核条目。</li>
+<li><b>匹配</b>：召回候选对并逐字段比对，生成待确认条目。<b>这一步不改动任何产品。</b></li>
+<li><b>人工复核</b>：人的决定写回档案并记入审计日志；同一对记录在证据没变之前不会再问第二遍。</li>
+<li><b>查询与导出</b>：档案查询、产品页（带出处）、三份 xlsx 导出。</li>
+</ol>
+
+<h2 id="s6">6. 字段出处</h2>
+<p>出处精确到字段，一路追到原件的单元格：</p>
+
+<!-- fig:r6 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="产品页的字段值经成员关系、来源记录、单元格追溯到原始文件">
+<defs><marker id="r6-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="r6-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box good" x="20" y="40" width="168" height="70" rx="8"/>
+<text x="104.0" y="72" text-anchor="middle" font-weight="600">产品页上的一个值</text>
+<text x="104.0" y="88" text-anchor="middle" class="small">尺寸 122 × 75 × 7 cm</text>
+<path class="arrow hi" d="M188,75 L208,75" marker-end="url(#r6-arrh)"/>
+<rect class="box " x="208" y="40" width="168" height="70" rx="8"/>
+<text x="292.0" y="72" text-anchor="middle" font-weight="600">Membership</text>
+<text x="292.0" y="88" text-anchor="middle" class="small">供应商 A · 记录 A-xxx</text>
+<path class="arrow hi" d="M376,75 L396,75" marker-end="url(#r6-arrh)"/>
+<rect class="box soft" x="396" y="40" width="168" height="70" rx="8"/>
+<text x="480.0" y="66" text-anchor="middle" font-weight="600">SourceRecord v2</text>
+<text x="480.0" y="80" text-anchor="middle" class="small">fields.dims</text>
+<text x="480.0" y="94" text-anchor="middle" class="small">规则 dims_lxwxh</text>
+<path class="arrow hi" d="M564,75 L584,75" marker-end="url(#r6-arrh)"/>
+<rect class="box soft" x="584" y="40" width="168" height="70" rx="8"/>
+<text x="668.0" y="66" text-anchor="middle" font-weight="600">单元格</text>
+<text x="668.0" y="80" text-anchor="middle" class="small">工作表 Sheet1 · G2</text>
+<text x="668.0" y="94" text-anchor="middle" class="small">原文 &quot;122 x 75 x 7 cm&quot;</text>
+<path class="arrow hi" d="M752,75 L772,75" marker-end="url(#r6-arrh)"/>
+<rect class="box ext" x="772" y="40" width="168" height="70" rx="8"/>
+<text x="856.0" y="72" text-anchor="middle" font-weight="600">SourceFile</text>
+<text x="856.0" y="88" text-anchor="middle" class="small">原件下载 · sha256</text>
+<rect class="box soft" x="584" y="150" width="168" height="56" rx="8"/>
+<text x="668.0" y="176" text-anchor="middle">PDF 时</text>
+<text x="668.0" y="190" text-anchor="middle" class="small">第 3 页 · 表 1 · 第 5 行</text>
+<path class="arrow" d="M668,110 L668,150" marker-end="url(#r6-arr)" stroke-dasharray="5 4"/>
+<rect class="box warn2" x="20" y="150" width="540" height="56" rx="6"/>
+<text x="290.0" y="176" text-anchor="middle">成员之间取值不同时</text>
+<text x="290.0" y="190" text-anchor="middle" class="small">各个值带出处并排展示、冲突标红；由人选定展示值（FieldChoice）并写明依据</text>
+</svg>
+<figcaption>图 R6 · 从产品页的一个值，一路点回原件的那个单元格。大模型不参与取值，所以每个值都有确定的出处。</figcaption>
+</figure>
+<!-- /fig:r6 -->
+<!-- fig:r6 -->
+
+<pre><code># SourceRecord.fields 中的一项
+"dims": {
+  "value": [122, 75, 7], "unit": "cm",
+  "raw": "122 x 75 x 7 cm",
+  "column": "Package Size", "cell": "G2", "sheet": "Sheet1",
+  "rule": "dims_lxwxh", "warnings": []
+}
+"price": {
+  "value": "51.01", "raw": "51.01",
+  "column": "Unit Price", "cell": "H4",
+  "rule": "decimal", "warnings": ["单元格格式为 $，与币种列 EUR 不一致，以币种列为准"]
+}</code></pre>
+<ul>
+<li>产品页上每个值都可以点开，看到它来自哪个供应商、哪个文件、哪个工作表的哪个单元格（PDF 则是哪一页、哪张表、哪一行），原文是什么，按哪条规则解析，有没有警告。</li>
+<li>原件可以随时下载比对；SourceRecord 同时保存整行原文，即使原件格式特殊也能在系统里对照。</li>
+<li>大模型只参与列映射建议，<b>不参与字段取值</b>：每个值都来自某个单元格，而不是模型"生成"的。</li>
+</ul>
+
+<h2 id="s7">7. 字段标准化</h2>
+<div class="tbl"><table>
+<tr><th>字段</th><th>规则</th><th>例子</th><th>缺失或异常时</th></tr>
+<tr><td>品类 part_type</td><td>按词表（<code>vocabulary.json</code>）做<b>最长匹配</b>；先去掉位置词</td><td>"Side Grille, Left side"、"Left Side Grille" 都得到 <code>Side Grille</code>；"Air Filter Housing Cap" <b>不会</b>被截成 Housing</td><td>词表外的名称保留原文，并警告"未登记品类"</td></tr>
+<tr><td>位置 position</td><td>优先取位置列，其次从名称里的位置词取（Left / Right / LH / RH / Driver / Passenger）</td><td>名称里没写左右、位置列写 Right，得到 Right</td><td>两处不一致时以位置列为准并警告；需要区分左右的品类缺位置时，列入缺失</td></tr>
+<tr><td>适配 fitment</td><td>品牌走别名表（新增北美品牌），剩余部分是车型，末尾的年份区间单独拆出</td><td>"Volvo VNL 2018-2023" 拆成 Volvo / VNL / 2018 / 2023；"Freightliner Cascadia P3" 拆成 Freightliner / Cascadia P3</td><td>只有品牌和车型、没有年份时，标记"适配不完整"</td></tr>
+<tr><td>尺寸 dims</td><td>解析 L×W×H 与单位，统一换算成 cm；比较时排序后逐项比，容差可配置（默认 ±1 cm）</td><td>"122 x 75 x 7 cm" 得到 [122, 75, 7]</td><td>无法解析时保留原文并警告</td></tr>
+<tr><td>编号</td><td>OE 与互换号、供应商料号、源记录 ID 分别入编号索引；一格多号先拆开</td><td>复用 <code>split_numbers()</code>、<code>normalize_number()</code></td><td>编号过短（&lt; 5 位）<b>不参与召回</b></td></tr>
+<tr><td>价格 / 币种</td><td>价格取单元格的数值而不是显示格式；币种取币种列</td><td>单元格格式写 $、币种列写 EUR 时，按 EUR 处理并警告</td><td>有价无币种时<b>不默认 USD</b>，列入缺失</td></tr>
+<tr><td>MOQ、报价日期</td><td>整数；日期接受 Excel 日期与常见文本格式</td><td>—</td><td>列入缺失</td></tr>
+</table></div>
+
+<h2 id="s8">8. 匹配规则</h2>
+<p>匹配只做两件事：<b>找出值得人看的记录对</b>，以及<b>把证据摆清楚</b>。它不改动任何产品。</p>
+
+<!-- fig:r3 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="候选记录对按品类、位置、缺失、适配尺寸、编号依次判定的决策树">
+<defs><marker id="r3-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="r3-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="30" width="160" height="48" rx="8"/>
+<text x="100.0" y="52" text-anchor="middle">候选对</text>
+<text x="100.0" y="66" text-anchor="middle" class="small">共享 OE · 同品类同车型 · 同源</text>
+<rect class="box dec" x="230" y="30" width="150" height="48" rx="8"/>
+<text x="305.0" y="58" text-anchor="middle">品类相同？</text>
+<path class="arrow" d="M180,54 L230,54" marker-end="url(#r3-arr)"/>
+<rect class="box dec" x="230" y="120" width="150" height="48" rx="8"/>
+<text x="305.0" y="148" text-anchor="middle">共享 OE？</text>
+<path class="arrow" d="M305,78 L305,120" marker-end="url(#r3-arr)"/>
+<text x="312" y="103" text-anchor="start" class="small">否</text>
+<rect class="box bad2" x="20" y="120" width="160" height="48" rx="8"/>
+<text x="100.0" y="142" text-anchor="middle" font-weight="600">编号冲突</text>
+<text x="100.0" y="156" text-anchor="middle" class="small">OE 录错或一号多品</text>
+<path class="arrow" d="M230,144 L180,144" marker-end="url(#r3-arr)"/>
+<text x="205" y="137" text-anchor="middle" class="small">是</text>
+<rect class="box ext" x="230" y="210" width="150" height="48" rx="8"/>
+<text x="305.0" y="232" text-anchor="middle">不成对</text>
+<text x="305.0" y="246" text-anchor="middle" class="small">只在记录页提示</text>
+<path class="arrow" d="M305,168 L305,210" marker-end="url(#r3-arr)"/>
+<text x="312" y="193" text-anchor="start" class="small">否</text>
+<rect class="box dec" x="440" y="30" width="150" height="48" rx="8"/>
+<text x="515.0" y="58" text-anchor="middle">左右相同？</text>
+<path class="arrow" d="M380,54 L440,54" marker-end="url(#r3-arr)"/>
+<text x="410" y="47" text-anchor="middle" class="small">是</text>
+<rect class="box bad2" x="440" y="120" width="150" height="48" rx="8"/>
+<text x="515.0" y="142" text-anchor="middle" font-weight="600">位置冲突</text>
+<text x="515.0" y="156" text-anchor="middle" class="small">仅在共享 OE 时；否则不成对</text>
+<path class="arrow" d="M515,78 L515,120" marker-end="url(#r3-arr)"/>
+<text x="522" y="103" text-anchor="start" class="small">否</text>
+<rect class="box dec" x="650" y="30" width="150" height="48" rx="8"/>
+<text x="725.0" y="58" text-anchor="middle">关键字段有缺失？</text>
+<path class="arrow" d="M590,54 L650,54" marker-end="url(#r3-arr)"/>
+<text x="620" y="47" text-anchor="middle" class="small">是</text>
+<rect class="box warn2" x="820" y="30" width="120" height="48" rx="8"/>
+<text x="880.0" y="52" text-anchor="middle" font-weight="600">信息不足</text>
+<text x="880.0" y="66" text-anchor="middle" class="small">补充后重配</text>
+<path class="arrow" d="M800,54 L820,54" marker-end="url(#r3-arr)"/>
+<text x="810" y="47" text-anchor="middle" class="small">是</text>
+<rect class="box dec" x="650" y="120" width="150" height="48" rx="8"/>
+<text x="725.0" y="148" text-anchor="middle">适配与尺寸一致？</text>
+<path class="arrow" d="M725,78 L725,120" marker-end="url(#r3-arr)"/>
+<text x="732" y="103" text-anchor="start" class="small">否</text>
+<rect class="box bad2" x="820" y="120" width="120" height="48" rx="8"/>
+<text x="880.0" y="142" text-anchor="middle">不同产品</text>
+<text x="880.0" y="156" text-anchor="middle" class="small">共享 OE 时为冲突</text>
+<path class="arrow" d="M800,144 L820,144" marker-end="url(#r3-arr)"/>
+<text x="810" y="137" text-anchor="middle" class="small">否</text>
+<rect class="box dec" x="650" y="210" width="150" height="48" rx="8"/>
+<text x="725.0" y="238" text-anchor="middle">共享 OE？</text>
+<path class="arrow" d="M725,168 L725,210" marker-end="url(#r3-arr)"/>
+<text x="732" y="193" text-anchor="start" class="small">是</text>
+<rect class="box good" x="820" y="210" width="120" height="48" rx="8"/>
+<text x="880.0" y="232" text-anchor="middle" font-weight="600">强证据</text>
+<text x="880.0" y="246" text-anchor="middle" class="small">疑似同一产品</text>
+<path class="arrow" d="M800,234 L820,234" marker-end="url(#r3-arr)"/>
+<text x="810" y="227" text-anchor="middle" class="small">是</text>
+<rect class="box dec" x="650" y="300" width="150" height="48" rx="8"/>
+<text x="725.0" y="328" text-anchor="middle">同一供应商？</text>
+<path class="arrow" d="M725,258 L725,300" marker-end="url(#r3-arr)"/>
+<text x="732" y="283" text-anchor="start" class="small">否</text>
+<rect class="box warn2" x="820" y="300" width="120" height="48" rx="8"/>
+<text x="880.0" y="322" text-anchor="middle" font-weight="600">同源重复</text>
+<text x="880.0" y="336" text-anchor="middle" class="small">问供应商</text>
+<path class="arrow" d="M800,324 L820,324" marker-end="url(#r3-arr)"/>
+<text x="810" y="317" text-anchor="middle" class="small">是</text>
+<rect class="box soft" x="440" y="300" width="150" height="48" rx="8"/>
+<text x="515.0" y="322" text-anchor="middle" font-weight="600">无编号佐证</text>
+<text x="515.0" y="336" text-anchor="middle" class="small">索取 OE / 图片</text>
+<path class="arrow" d="M650,324 L590,324" marker-end="url(#r3-arr)"/>
+<text x="620" y="317" text-anchor="middle" class="small">否</text>
+<rect class="box ext" x="20" y="390" width="920" height="50" rx="6"/>
+<text x="480.0" y="420" text-anchor="middle">所有类别 → 待确认条目：写明触发原因、一致字段、冲突字段（两边取值与出处）、缺失字段、建议动作。没有任何分支会自动合并。</text>
+</svg>
+<figcaption>图 R3 · 一对候选记录的判定顺序。品类与左右是硬冲突，最先判断；缺失字段排在"是否一致"之前，因为信息不全时下"一致"或"不一致"的结论都不可靠。</figcaption>
+</figure>
+<!-- /fig:r3 -->
+<!-- fig:r3 -->
+
+<h3>8.1 召回：哪些记录对值得比较</h3>
+<ol>
+<li>归一化后<b>共享 OE 或互换号</b>（编号至少 5 位）；</li>
+<li><b>同品类 + 同适配品牌与车型</b>，用来覆盖没有 OE 的记录；</li>
+<li><b>同一供应商内</b>品类、位置、适配、尺寸都相同的两条记录，即同源重复。</li>
+</ol>
+<p>不成对的情况：<b>品类不同</b>或<b>左右不同</b>，且没有共享编号。例如同一车型下尺寸恰好相同的空滤壳和风扇罩、同一车型的左格栅和右格栅，都不会配成一对，只在各自的记录页显示一条提示，比如"同适配下有尺寸相同但品类不同的记录，已按品类区分"。一旦共享了编号，同样的差异就升级为"编号冲突"或"位置冲突"，必须交人。</p>
+<h3>8.2 比对与分类</h3>
+<div class="tbl"><table>
+<tr><th>类别</th><th>条件</th><th>强度</th><th>建议人工动作</th></tr>
+<tr><td><b>强证据疑似同一产品</b></td><td>共享 OE，且品类、位置、适配、尺寸一致，没有缺失</td><td>强</td><td>核对后确认归一（可勾选后批量确认）</td></tr>
+<tr><td><b>无编号佐证</b></td><td>没有共享编号，但品类、位置、适配、尺寸一致</td><td>中</td><td>向供应商索取 OE 号或实物图后再确认</td></tr>
+<tr><td><b>编号冲突</b></td><td>共享 OE，但<b>品类不同</b></td><td>冲突</td><td>核对目录或图片；多半是 OE 录错或一号多品。建议判为不同产品，并在该 OE 上标注"存疑"</td></tr>
+<tr><td><b>位置冲突</b></td><td>共享 OE，但<b>左右不同</b></td><td>冲突</td><td>确认该 OE 是否左右通用；通常判为不同产品（左右件）</td></tr>
+<tr><td><b>信息不足</b></td><td>关键字段缺失（适配年份、尺寸、位置），无法判断</td><td>弱</td><td>补充缺失字段后重新匹配</td></tr>
+<tr><td><b>同源重复</b></td><td>同一供应商的两条记录关键字段一致</td><td>中</td><td>向供应商确认是否重复报价</td></tr>
+</table></div>
+<p><b>硬性约束</b>：短编号相近、尺寸相同、名称相似、共享 OE，<b>任何单一信号都不会导致合并</b>。按已定决策，所有合并都要人来点；上表只决定"出现在哪一类、排在哪里、建议怎么做"。</p>
+<h3>8.3 规则可调</h3>
+<p>规则分两个文件，都进版本库、可评审：<code>apps/sources/rules/vocabulary.json</code> 放品类词表、位置词、品牌别名、单位，通常由数据运营补充；<code>apps/archive/rules/matching.json</code> 放关键字段清单、尺寸容差、召回用编号的最小长度、各类别的建议动作，由负责人调整。每个待确认条目都记下生成它时的 rules_version；改完规则运行 <code>manage.py archive_rematch</code>，只重新生成未决条目，已决条目保持原样。</p>
+
+<h2 id="s9">9. 人工复核与回写</h2>
+
+<!-- fig:r4 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="待确认条目的状态流转与归一产品状态的对应关系">
+<defs><marker id="r4-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="r4-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="lane" x="10" y="10" width="940" height="150" rx="10"/>
+<text x="22" y="28" class="lane-label">待确认条目 ReviewItem</text>
+<rect class="box dec" x="30" y="60" width="130" height="50" rx="8"/>
+<text x="95.0" y="82" text-anchor="middle" font-weight="600">未决</text>
+<text x="95.0" y="98" text-anchor="middle" class="small">open</text>
+<rect class="box good" x="230" y="60" width="130" height="50" rx="8"/>
+<text x="295.0" y="82" text-anchor="middle">确认同一</text>
+<text x="295.0" y="98" text-anchor="middle" class="small">same</text>
+<path class="arrow" d="M160,85 L230,85" marker-end="url(#r4-arr)"/>
+<rect class="box " x="380" y="60" width="130" height="50" rx="8"/>
+<text x="445.0" y="82" text-anchor="middle">判为不同</text>
+<text x="445.0" y="98" text-anchor="middle" class="small">different</text>
+<path class="arrow" d="M160,85 L195,85 L195,130 L445,130 L445,110" marker-end="url(#r4-arr)"/>
+<rect class="box " x="530" y="60" width="130" height="50" rx="8"/>
+<text x="595.0" y="82" text-anchor="middle">确认独立</text>
+<text x="595.0" y="98" text-anchor="middle" class="small">independent</text>
+<path class="arrow" d="M160,85 L195,85 L195,130 L595,130 L595,110" marker-end="url(#r4-arr)"/>
+<rect class="box " x="680" y="60" width="130" height="50" rx="8"/>
+<text x="745.0" y="82" text-anchor="middle">待补充</text>
+<text x="745.0" y="98" text-anchor="middle" class="small">needs_info</text>
+<path class="arrow" d="M160,85 L195,85 L195,130 L745,130 L745,110" marker-end="url(#r4-arr)"/>
+<rect class="box warn2" x="830" y="60" width="110" height="50" rx="8"/>
+<text x="885.0" y="82" text-anchor="middle">证据已变化</text>
+<text x="885.0" y="98" text-anchor="middle" class="small">重新打开</text>
+<path class="arrow" d="M885,60 L885,34 L95,34 L95,60" marker-end="url(#r4-arr)" stroke-dasharray="5 4"/>
+<text x="490" y="28" text-anchor="middle" class="small">evidence_hash 改变 → 回到未决</text>
+<rect class="lane" x="10" y="180" width="940" height="150" rx="10"/>
+<text x="22" y="198" class="lane-label">归一产品 Product</text>
+<rect class="box soft" x="30" y="230" width="150" height="56" rx="8"/>
+<text x="105.0" y="256" text-anchor="middle" font-weight="600">待核</text>
+<text x="105.0" y="270" text-anchor="middle" class="small">每条新记录自成一个</text>
+<rect class="box good" x="330" y="230" width="170" height="56" rx="8"/>
+<text x="415.0" y="256" text-anchor="middle" font-weight="600">已确认归一</text>
+<text x="415.0" y="270" text-anchor="middle" class="small">≥ 2 条成员</text>
+<rect class="box good" x="640" y="230" width="150" height="56" rx="8"/>
+<text x="715.0" y="262" text-anchor="middle">已确认独立</text>
+<path class="arrow" d="M180,250 L330,250" marker-end="url(#r4-arr)"/>
+<text x="255" y="243" text-anchor="middle" class="small">确认同一：合并</text>
+<path class="arrow" d="M330,270 L180,270" marker-end="url(#r4-arr)" stroke-dasharray="5 4"/>
+<text x="255" y="290" text-anchor="middle" class="small">移出：撤销合并</text>
+<path class="arrow" d="M180,300 L180,316 L715,316 L715,286" marker-end="url(#r4-arr)"/>
+<text x="450" y="312" text-anchor="middle" class="small">确认独立</text>
+<path class="arrow" d="M295,110 L295,160 L415,160 L415,230" stroke-dasharray="5 4"/>
+<rect class="box ext" x="820" y="225" width="120" height="66" rx="8"/>
+<text x="880.0" y="248" text-anchor="middle">DecisionLog</text>
+<text x="880.0" y="264" text-anchor="middle" class="small">每个动作一条</text>
+<text x="880.0" y="278" text-anchor="middle" class="small">只增不删</text>
+</svg>
+<figcaption>图 R4 · 条目状态与产品状态。上排是人对一个条目的决定，下排是它对产品的影响；合并可以撤销，证据变化会把已决条目重新打开。</figcaption>
+</figure>
+<!-- /fig:r4 -->
+<!-- fig:r4 -->
+
+<div class="tbl narrow"><table>
+<tr><th>动作</th><th>对档案的影响</th></tr>
+<tr><td>确认同一产品</td><td>把两条记录所在的产品合并为一个，状态为"已确认归一"</td></tr>
+<tr><td>判为不同产品</td><td>各自保留；这一对之后不再召回，除非证据变化</td></tr>
+<tr><td>确认独立</td><td>单成员产品标为"已确认独立"</td></tr>
+<tr><td>标记待补充</td><td>产品标 needs_info，写明缺哪些字段，进入待确认清单</td></tr>
+<tr><td>移出（拆分）</td><td>把某条记录从归一产品中移出，恢复成单成员"待核"产品——合并可以撤销</td></tr>
+<tr><td>选定取值</td><td>成员之间有分歧的字段由人选一个展示值，并写明依据</td></tr>
+</table></div>
+<ul>
+<li>每个动作都写一条 DecisionLog（谁、何时、为什么、改了什么），只增不删。</li>
+<li><b>决策复用</b>：条目的 evidence_hash 由两边的关键字段计算。重新导入或重跑规则后，证据没变就沿用原决定；证据变了就重新打开条目，并标注"证据已变化"。</li>
+<li>复核界面把两条记录左右并排摆开，冲突字段标红，缺失字段标黄，每个值旁边都能看到出处。</li>
+</ul>
+
+<h2 id="s10">10. 增量导入</h2>
+
+<!-- fig:r5 -->
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="新资料中每一行按身份、内容哈希、变化字段判定为新增、未变、报价更新或关键字段变化">
+<defs><marker id="r5-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker><marker id="r5-arrh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent)"/></marker></defs>
+<rect class="box ext" x="20" y="40" width="170" height="56" rx="8"/>
+<text x="105.0" y="66" text-anchor="middle">新文件的一行</text>
+<text x="105.0" y="80" text-anchor="middle" class="small">供应商 + record_key</text>
+<rect class="box dec" x="240" y="40" width="170" height="56" rx="8"/>
+<text x="325.0" y="72" text-anchor="middle">这个身份见过？</text>
+<path class="arrow" d="M190,68 L240,68" marker-end="url(#r5-arr)"/>
+<rect class="box good" x="240" y="150" width="170" height="56" rx="8"/>
+<text x="325.0" y="176" text-anchor="middle" font-weight="600">新增</text>
+<text x="325.0" y="190" text-anchor="middle" class="small">自成待核产品 · 参与匹配</text>
+<path class="arrow" d="M325,96 L325,150" marker-end="url(#r5-arr)"/>
+<text x="333" y="128" text-anchor="start" class="small">否</text>
+<rect class="box dec" x="460" y="40" width="170" height="56" rx="8"/>
+<text x="545.0" y="72" text-anchor="middle">内容哈希相同？</text>
+<path class="arrow" d="M410,68 L460,68" marker-end="url(#r5-arr)"/>
+<text x="435" y="61" text-anchor="middle" class="small">是</text>
+<rect class="box " x="460" y="150" width="170" height="56" rx="8"/>
+<text x="545.0" y="176" text-anchor="middle">未变</text>
+<text x="545.0" y="190" text-anchor="middle" class="small">不建新版本</text>
+<path class="arrow" d="M545,96 L545,150" marker-end="url(#r5-arr)"/>
+<text x="553" y="128" text-anchor="start" class="small">是</text>
+<rect class="box dec" x="680" y="40" width="260" height="56" rx="8"/>
+<text x="810.0" y="72" text-anchor="middle">只有价格 / 币种 / MOQ / 日期变了？</text>
+<path class="arrow" d="M630,68 L680,68" marker-end="url(#r5-arr)"/>
+<text x="655" y="61" text-anchor="middle" class="small">否</text>
+<rect class="box good" x="680" y="150" width="120" height="56" rx="8"/>
+<text x="740.0" y="176" text-anchor="middle" font-weight="600">报价更新</text>
+<text x="740.0" y="190" text-anchor="middle" class="small">新版本 · 成员延续</text>
+<path class="arrow" d="M740,96 L740,150" marker-end="url(#r5-arr)"/>
+<text x="748" y="128" text-anchor="start" class="small">是</text>
+<rect class="box bad2" x="820" y="150" width="120" height="56" rx="8"/>
+<text x="880.0" y="176" text-anchor="middle" font-weight="600">关键字段变化</text>
+<text x="880.0" y="190" text-anchor="middle" class="small">暂停成员 · 复核</text>
+<path class="arrow" d="M880,96 L880,150" marker-end="url(#r5-arr)"/>
+<text x="888" y="128" text-anchor="start" class="small">否</text>
+<rect class="box ext" x="20" y="250" width="390" height="50" rx="6"/>
+<text x="215.0" y="280" text-anchor="middle">上一版文件有、这次没有 → 本次未出现（只提示，不删除）</text>
+<rect class="box ext" x="460" y="250" width="480" height="50" rx="6"/>
+<text x="700.0" y="280" text-anchor="middle">预检逐行列出结果与字段差异（旧值 → 新值），人确认后才入库</text>
+</svg>
+<figcaption>图 R5 · 增量导入的版本对比。"更新"分两种：只动报价的延续原有归一，动了关键字段的必须重新交人确认。</figcaption>
+</figure>
+<!-- /fig:r5 -->
+<!-- fig:r5 -->
+
+<p><b>记录身份</b>是"供应商 + record_key"，record_key 依次取：源记录 ID 列 → 供应商料号 → 整行内容哈希。最后一种会警告"无稳定键，无法识别更新"。</p>
+<div class="tbl narrow"><table>
+<tr><th>预检结果</th><th>判定</th><th>入库后</th></tr>
+<tr><td>新增</td><td>这个身份第一次出现</td><td>自成"待核"产品，参与匹配</td></tr>
+<tr><td>未变</td><td>内容哈希相同</td><td>不新建版本，只记录"本次再次出现"</td></tr>
+<tr><td>报价更新</td><td>只有价格、币种、MOQ、报价日期变化</td><td>新建版本；成员关系延续；产品页显示报价历史</td></tr>
+<tr><td>关键字段变化</td><td>品类、位置、适配、尺寸、OE 有变化</td><td>新建版本；<b>暂停成员关系</b>，生成"关键字段变化"复核条目</td></tr>
+<tr><td>本次未出现</td><td>上一版文件里有、这次没有</td><td>只提示，不删除</td></tr>
+</table></div>
+<p>预检页逐行列出结果和字段级差异（旧值 → 新值），人确认后才入库。</p>
+
+<h2 id="s11">11. 查询与三份导出</h2>
+<p><b>查询</b>：一个输入框，可以输任一编号（供应商料号、OE / 互换号、源记录 ID，复用编号归一化与分级匹配）、关键词（品名、品类、车型）、品牌、供应商名称。结果按归一产品聚合，并标明"命中哪条记录的哪个字段"。</p>
+<p><b>产品页</b>：汇总属性（冲突标红），成员记录表（供应商、料号、原始名称、位置、适配、尺寸、OE、价格与币种、MOQ、报价日期、出处链接），相关的待确认条目，决策历史。</p>
+<div class="tbl"><table>
+<tr><th>导出</th><th>一行是</th><th>列</th></tr>
+<tr><td>主数据.xlsx</td><td>一个归一产品</td><td>产品编码、状态、品类、位置、适配、尺寸、OE 列表、成员数、各供应商料号、冲突字段、待补充字段</td></tr>
+<tr><td>供应商报价.xlsx</td><td>一条当前版本的来源记录</td><td>产品编码、供应商、供应商料号、价格、<b>币种</b>、MOQ、报价日期、原始文件、工作表 / 页、行号</td></tr>
+<tr><td>待人工确认清单.xlsx</td><td>一个未决条目</td><td>类别、强度、涉及记录（供应商 + 记录 ID + 定位）、触发原因、冲突字段（两边取值）、缺失字段、建议动作、状态</td></tr>
+</table></div>
+
+<h2 id="s12">12. 自动与人工的分界</h2>
+<div class="tbl narrow"><table>
+<tr><th>系统自动做</th><th>必须由人做</th></tr>
+<tr><td>原件留存与去重；解析与定位；字段标准化与警告；出处记录；版本对比；候选召回、分类、证据整理与建议动作；三份导出</td><td>首次列映射确认；入库确认；<b>所有归一、拆分、判为不同的决定</b>；冲突字段取值；补充缺失信息；规则调整</td></tr>
+</table></div>
+
+<h2 id="s13">13. 后续维护</h2>
+<ul>
+<li><b>新供应商或新文件</b>：上传后首次确认列映射，存为该供应商的模板；之后同格式文件直接预检、入库。</li>
+<li><b>规则调整</b>：词表改 <code>vocabulary.json</code>，匹配参数改 <code>matching.json</code>，评审后运行 <code>archive_rematch</code>；已决条目不受影响，证据变化的条目自动重开。</li>
+<li><b>人工确认的回写</b>：在复核台操作，决定立即生效并写入审计日志；重新导入时自动沿用。</li>
+<li><b>命令行</b>：<code>archive_import &lt;文件&gt; --supplier &lt;名称&gt;</code>、<code>archive_export</code>，用于批量处理与现场演示。</li>
+</ul>
+
+<h2 id="s14">14. 施工计划 M21–M29</h2>
+<p>每个里程碑一次提交、一次审核，文件清单、验收命令与审核清单见 <a href="schedule.html#phase2">施工进度表 · 第二阶段</a>。测试用合成数据复现与样例资料相同的陷阱模式（共享 OE 但品类不同、左右不同、尺寸相同品类不同、写法不同实为同件、无编号、缺字段、多币种、单元格格式与币种矛盾），不引用公司资料。</p>
+<div class="tbl narrow"><table>
+<tr><th>#</th><th>里程碑</th><th>工时</th></tr>
+<tr><td>M21</td><td>sources 数据模型与原件留存</td><td>0.5 天</td></tr>
+<tr><td>M22</td><td>Excel / CSV 提取、单元格级出处、列映射与供应商模板</td><td>1 天</td></tr>
+<tr><td>M23</td><td>PDF 表格提取</td><td>0.5 天</td></tr>
+<tr><td>M24</td><td>字段标准化与首次入库</td><td>0.75 天</td></tr>
+<tr><td>M25</td><td>archive 模型与匹配引擎</td><td>1 天</td></tr>
+<tr><td>M26</td><td>人工复核台与回写</td><td>1 天</td></tr>
+<tr><td>M27</td><td>增量导入：版本对比与预检</td><td>0.5 天</td></tr>
+<tr><td>M28</td><td>档案查询、产品页、三份导出与命令行</td><td>1 天</td></tr>
+<tr><td>M29</td><td>交付文档、结果样例、"未见过的资料"演练</td><td>0.5–1 天</td></tr>
+</table></div>
+<p>合计约 7 个工作日。</p>
+
+<h2 id="s15">15. 风险与不做的事</h2>
+<div class="tbl narrow"><table>
+<tr><th>风险</th><th>应对</th></tr>
+<tr><td>现场资料的表头、格式完全没见过</td><td>同义词 + 大模型建议 + 人工确认三层兜底；M29 用一份自造的"陌生"资料（不同列名、PDF、夹带更新）完整演练</td></tr>
+<tr><td>PDF 没有表格线或是扫描件</td><td>先用线条策略、再用文本对齐策略抽表；仍失败时文件标为"无法识别表格"，保留原件并提示人工处理。扫描件 OCR 不做</td></tr>
+<tr><td>品类词表不全</td><td>未登记品类保留原文并警告，照样参与"同名"比对；词表可随时补充后重跑</td></tr>
+<tr><td>误合并</td><td>不自动合并；合并可撤销；决定可追溯到人与理由</td></tr>
+</table></div>
+<p><b>这一阶段不做</b>：汇率换算、扫描件 OCR、按图片判断是否同一件、细粒度权限（沿用登录与 staff 两级）。</p>
+<p class="meta">相关文档：<a href="search-design.html">智能搜索详细设计</a>（编号归一化与分级匹配，被本阶段复用）· <a href="schedule.html#phase2">施工进度表 · 第二阶段</a></p>
+</main>
+<footer class="site">可追溯归档与归一化 v1.0 · 演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>

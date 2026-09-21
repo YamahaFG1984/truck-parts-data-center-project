@@ -14,3 +14,9 @@
 settings 在 config/settings/ 分层；业务逻辑放 services 与 QuerySet，视图保持薄；
 所有 AI 调用经 apps/ai/llm/factory.get_client()；AI 产出只能通过 AISuggestion.accept() 写入业务字段。
 界面中文，字段英文，USD 单币种。演示数据均为合成，页脚保留声明。
+
+第二阶段（M21–M29，可追溯归档与归一化）另读 docs/archive-design.html，并遵守：
+新功能只放在 apps/sources 与 apps/archive，不改第一阶段代码（可调用，不修改）；
+来源记录写入后不可修改，更新即新版本；报价保留原币种，不换算、不默认 USD；
+匹配只生成待确认条目，归一关系只能经 apps/archive/services/review.py 写入；
+extra/ 是公司提供的资料，不进仓库，测试用合成数据。
