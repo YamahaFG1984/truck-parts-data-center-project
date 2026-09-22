@@ -93,8 +93,7 @@ def plan(source_file: SourceFile) -> Plan:
         for row in sheet.rows:
             item = Planned(
                 sheet=sheet.name, row_no=row.row_no, page=row.page, table_no=row.table_no,
-                locator=(f"P{row.page}/T{row.table_no}/R{row.row_no}" if row.page
-                         else f"{sheet.name}!R{row.row_no}"),
+                locator=locator_of(sheet.name, row),
                 raw=row.texts(), cells={h: c.coord for h, c in row.cells.items()},
                 std=standardize(row, columns[sheet.name]),
             )
@@ -148,6 +147,15 @@ def commit(source_file: SourceFile, user) -> int:
         records_committed.send(sender=SourceFile, source_file=source_file, records=records,
                                user=user)
     return len(records)
+
+
+def locator_of(sheet_name: str, row) -> str:
+    return (f"P{row.page}/T{row.table_no}/R{row.row_no}" if row.page
+            else f"{sheet_name}!R{row.row_no}")
+
+
+def numbers_of(record, std: Standardized):
+    return _numbers(record, std)
 
 
 def _compare(item: Planned, previous: SourceRecord | None) -> None:

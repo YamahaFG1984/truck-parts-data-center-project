@@ -9,3 +9,4 @@ def on_records_committed(sender, *, source_file, records, user=None, **kwargs):
                   user=user)
     review.advance([r for r in records if r.previous_id], user=user)
     matching.rematch()
+    review.settle([r for r in records if r.previous_id], user=user)

@@ -35,8 +35,8 @@
   {% endfor %}
     <tr class="border-t border-slate-100 text-xs text-slate-500">
       <td class="py-1.5 px-3">出处</td>
-      <td class="py-1.5 px-3"><a class="text-blue-700 hover:underline" href="{% url 'sources:detail' item.record_a.source_file_id %}">{{ item.record_a.source_file.original_name }}</a> · {{ item.record_a.locator }}</td>
-      {% if item.record_b %}<td class="py-1.5 px-3"><a class="text-blue-700 hover:underline" href="{% url 'sources:detail' item.record_b.source_file_id %}">{{ item.record_b.source_file.original_name }}</a> · {{ item.record_b.locator }}</td>{% endif %}
+      <td class="py-1.5 px-3"><a class="text-blue-700 hover:underline" href="{% url 'sources:detail' item.record_a.source_file_id %}">{{ item.record_a.source_file.original_name }}</a> · {{ item.record_a.locator }} · <a class="text-blue-700 hover:underline" href="{% url 'archive:record' item.record_a.pk %}">记录页</a></td>
+      {% if item.record_b %}<td class="py-1.5 px-3"><a class="text-blue-700 hover:underline" href="{% url 'sources:detail' item.record_b.source_file_id %}">{{ item.record_b.source_file.original_name }}</a> · {{ item.record_b.locator }} · <a class="text-blue-700 hover:underline" href="{% url 'archive:record' item.record_b.pk %}">记录页</a></td>{% endif %}
     </tr>
   </tbody>
 </table>

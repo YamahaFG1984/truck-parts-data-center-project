@@ -727,12 +727,16 @@ git commit -m "feat(sources): incremental import with version diff (M27)" &amp;&
 <li>产品页（汇总属性、冲突、成员报价表、出处弹层、相关条目、决策历史）；来源记录页（整行原文、字段出处）；原件下载</li>
 <li><code>services/export.py</code>：三份 xlsx，列见设计文档 §11；币种原样</li>
 <li><code>management/commands/archive_import.py</code>（文件 + 供应商 + 映射模板，非交互）、<code>archive_export.py</code></li>
+<li><code>archive_rematch --restandardize [--commit]</code>（2026-09-22 确认方案 A）：从留存原件按当前词表重新推导字段，结果不同的写成新版本（变化类型"规则重算"，记下词表版本）；定位唯一约束放宽为"文件 + 定位 + 版本"（<code>apps/sources</code> 迁移 0003）；默认只预演。重算造成的关键字段变化与同产品其他成员仍一致（如品类改名）时不暂停，否则照常进复核</li>
+<li>记录页显示"相似但未配对"的提示：同适配同尺寸但品类不同、同品类但左右不同、两边 OE 均不相同</li>
 <li>测试：四种查询各一；导出列与行数；出处列可定位到文件、工作表 / 页、行</li>
 </ul>
 <h4>验收</h4>
-<pre><code>pytest -q apps/archive
+<pre><code>pytest -q apps/archive apps/sources
 ruff check .
+python manage.py makemigrations --check --dry-run
 python manage.py archive_export --out /tmp/archive-export
+python manage.py archive_rematch --restandardize
 git commit -m "feat(archive): search, product page, exports and commands (M28)" &amp;&amp; git tag M28</code></pre>
 <h4>审核清单</h4>
 <ul><li>导出里的每一行都能追到原件的一行。</li><li>不同币种的报价没有被加总或比较。</li></ul>

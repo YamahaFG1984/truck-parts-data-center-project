@@ -309,3 +309,33 @@ def _side(record, name, value) -> dict:
     source_field = {"years": "fitment"}.get(name, name)
     return {"value": _show(name, value), "record": record.pk,
             "sources": record.fields.get(source_field, {}).get("sources", [])}
+
+
+# --- record page hints ---------------------------------------------------------------
+
+def hints(record: SourceRecord) -> list[str]:
+    """Why lookalikes of this record were not paired (§8.2): the same fitment and size
+    but another part type, the same type but the other side, or both sides with OE
+    numbers none of which match. Read-only; nothing is proposed."""
+    if not _fitment(record):
+        return []
+    mine = _numbers(record)
+    others = (SourceRecord.objects.current().exclude(pk=record.pk)
+              .filter(make__iexact=record.make).select_related("supplier")
+              .prefetch_related("numbers"))
+    notes = []
+    for other in sorted(others, key=identity):
+        if _norm(_fitment(other)) != _norm(_fitment(record)) or mine & _numbers(other):
+            continue
+        who = f"{other.supplier.name} {other.record_key}"
+        same_type = _same(other.part_type, record.part_type)
+        if not same_type and _dims(record) and _dims(other) and _dims_equal(_dims(record),
+                                                                              _dims(other)):
+            notes.append(f"同适配下 {who}（{other.part_type}）尺寸相同但品类不同，"
+                         "已按品类区分，不配对")
+        elif same_type and record.position and other.position and (
+                record.position != other.position):
+            notes.append(f"{who} 同品类同适配，但位置是 {other.position}，已按左右区分，不配对")
+        elif same_type and mine and _numbers(other):
+            notes.append(f"{who} 同品类同适配，但两边的 OE 号没有一个相同，视为不同产品")
+    return notes

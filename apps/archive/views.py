@@ -1,14 +1,22 @@
+from urllib.parse import quote
+
 from django.contrib import messages
+from django.db.models import Count, Q
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import TemplateView
 
+from apps.sources.models import SourceRecord
+from apps.sources.services.standardize import LABELS
 from apps.suppliers.models import Supplier
 
-from .models import DecisionLog, Membership, ReviewItem
-from .services import queue, review
+from .models import DecisionLog, Membership, Product, ReviewItem
+from .services import export, matching, products, queue, review, search
+
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 ACTIONS = {
     "same": (review.confirm_same, "已确认为同一产品：{code}"),
@@ -106,6 +114,90 @@ class DetachView(View):
             messages.success(request, f"{membership.record_key} 已移出，成为 {product.code}"
                                       "（待核）；相关配对已重新进入待确认。")
         return redirect(_next(request))
+
+
+class SearchView(TemplateView):
+    """?q= any number, keyword, brand or supplier; ?supplier= narrows to one supplier."""
+
+    template_name = "archive/search.html"
+
+    def get_context_data(self, **kwargs):
+        params = self.request.GET
+        supplier = Supplier.objects.filter(pk=params.get("supplier", "")).first() if (
+            params.get("supplier", "").isdigit()) else None
+        query = params.get("q", "").strip()
+        return super().get_context_data(**kwargs) | {
+            "query": query, "supplier": supplier,
+            "results": search.search(query, supplier) if query else [],
+            "suppliers": Supplier.objects.filter(source_records__isnull=False).distinct(),
+            "status_counts": (Product.objects.filter(memberships__isnull=False).distinct()
+                              .values("status").annotate(n=Count("id")).order_by("status")),
+            "status_labels": dict(Product.Status.choices),
+            "open_items": ReviewItem.objects.filter(status="open").count(),
+            "exports": export.FILES,
+        }
+
+
+class ProductView(View):
+    def get(self, request, pk):
+        product = get_object_or_404(Product, pk=pk)
+        if product.merged_into_id:
+            messages.info(request, f"{product.code} 已并入 {product.merged_into.code}。")
+            return redirect("archive:product", pk=product.merged_into_id)
+        members = products.members(product)
+        identities = [f"{m.supplier_id}:{m.record_key}" for m in members]
+        items = (ReviewItem.objects.filter(Q(identity_a__in=identities)
+                                           | Q(identity_b__in=identities))
+                 .exclude(status="superseded").select_related("record_a", "record_b")
+                 .order_by("status", "-id"))
+        return render(request, "archive/product.html", {
+            "product": product, "members": members,
+            "summary": products.summary(product, members),
+            "missing": products.missing(product, members), "items": items,
+            "history": _history(product, items),
+        })
+
+
+class RecordView(View):
+    """One source record: the whole original row, each field's source, its versions."""
+
+    def get(self, request, pk):
+        record = get_object_or_404(SourceRecord.objects.select_related(
+            "supplier", "source_file"), pk=pk)
+        membership = review.membership_of(record)
+        versions, cursor = [], SourceRecord.objects.current().filter(
+            supplier=record.supplier, record_key=record.record_key).first()
+        while cursor is not None:
+            versions.append(cursor)
+            cursor = cursor.previous
+        return render(request, "archive/record.html", {
+            "record": record, "membership": membership, "versions": versions,
+            "rows": [{"label": label} | queue.cell(record, name) for name, label in queue.ROWS],
+            "raw": [(header, record.cells.get(header, ""), text)
+                    for header, text in record.raw.items()],
+            "hints": matching.hints(record),
+            "missing": [LABELS.get(name, name) for name in record.missing],
+            "is_current": versions and versions[0].pk == record.pk,
+        })
+
+
+class ExportView(View):
+    def get(self, request, kind):
+        if kind not in export.FILES:
+            raise Http404
+        response = HttpResponse(export.to_bytes(export.BUILDERS[kind]()), content_type=XLSX)
+        response["Content-Disposition"] = (
+            f"attachment; filename*=UTF-8''{quote(export.FILES[kind])}")
+        return response
+
+
+def _history(product, items):
+    """Decisions on the product's items, plus product-level actions naming its code."""
+    logs = DecisionLog.objects.select_related("actor", "review_item").filter(
+        Q(review_item__in=items))
+    extra = [log for log in DecisionLog.objects.filter(review_item__isnull=True)
+             .select_related("actor")[:500] if product.code in str(log.payload)]
+    return sorted({*logs, *extra}, key=lambda log: (log.at, log.pk), reverse=True)
 
 
 def _next(request) -> str:

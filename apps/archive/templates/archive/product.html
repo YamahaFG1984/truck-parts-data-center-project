@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.code }} · 档案查询{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{% url 'archive:search' %}" class="hover:text-blue-700">档案查询</a> / {{ product.code }}</nav>
+<div class="flex flex-wrap items-center gap-3 mb-4">
+  <h1 class="text-2xl font-bold">{{ product.code }}</h1>
+  <span class="text-sm rounded bg-slate-100 px-2 py-0.5">{{ product.get_status_display }}</span>
+  {% if missing %}<span class="text-sm rounded bg-amber-100 text-amber-800 px-2 py-0.5">待补充：{{ missing|join:"、" }}</span>{% endif %}
+</div>
+
+<section class="rounded-lg border border-slate-200 bg-white mb-4 overflow-x-auto">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3 w-32">汇总</th><th class="py-2 px-3">取值</th><th class="py-2 px-3">来自</th></tr></thead>
+  <tbody>
+  {% for line in summary %}
+    <tr class="border-t border-slate-100 align-top {% if line.conflict %}bg-red-50{% endif %}">
+      <td class="py-1.5 px-3 text-slate-500">{{ line.label }}</td>
+      <td class="py-1.5 px-3">
+        {% if line.conflict %}<span class="text-red-800 font-medium">成员不一致：{{ line.texts|join:" / " }}</span>
+        {% elif line.text %}{{ line.text }}{% if line.choice %} <span class="text-xs text-emerald-700">（人工选定：{{ line.choice.reason }}）</span>{% endif %}
+        {% else %}<span class="text-slate-300">—</span>{% endif %}
+      </td>
+      <td class="py-1.5 px-3 text-xs text-slate-500">{% for text, m in line.values %}{% if text %}<div>{{ m.supplier.name }} · {{ m.record_key }}：{{ text }}</div>{% endif %}{% endfor %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</section>
+
+<h2 class="font-semibold mb-2">成员记录与报价（{{ members|length }}）</h2>
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white mb-4">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr>
+    <th class="py-2 px-3">供应商 · 记录</th><th class="py-2 px-3">料号</th><th class="py-2 px-3">原始名称</th><th class="py-2 px-3">位置</th><th class="py-2 px-3">适配</th><th class="py-2 px-3">尺寸 cm</th><th class="py-2 px-3">单价</th><th class="py-2 px-3">币种</th><th class="py-2 px-3">MOQ</th><th class="py-2 px-3">报价日期</th><th class="py-2 px-3">出处</th>
+  </tr></thead>
+  <tbody>
+  {% for m in members %}{% with r=m.current_record %}
+    <tr class="border-t border-slate-100 align-top {% if m.status != 'active' %}bg-amber-50{% endif %}">
+      <td class="py-1.5 px-3 whitespace-nowrap"><a class="text-blue-700 hover:underline" href="{% url 'archive:record' r.pk %}">{{ m.supplier.name }} · {{ m.record_key }}</a> <span class="text-xs text-slate-400">v{{ r.version }}</span>{% if m.status != 'active' %}<div class="text-xs text-amber-800">{{ m.get_status_display }}</div>{% endif %}</td>
+      <td class="py-1.5 px-3">{{ r.supplier_sku }}</td>
+      <td class="py-1.5 px-3">{{ r.name }}</td>
+      <td class="py-1.5 px-3">{{ r.position }}</td>
+      <td class="py-1.5 px-3">{{ r.make }} {{ r.model }}{% if r.year_from %} {{ r.year_from }}–{{ r.year_to|default:"" }}{% endif %}</td>
+      <td class="py-1.5 px-3 whitespace-nowrap">{% if r.dim_l_cm %}{{ r.dim_l_cm|floatformat:"-2" }}×{{ r.dim_w_cm|floatformat:"-2" }}×{{ r.dim_h_cm|floatformat:"-2" }}{% endif %}</td>
+      <td class="py-1.5 px-3 text-right">{{ r.price|floatformat:"-4"|default:"" }}</td>
+      <td class="py-1.5 px-3">{{ r.currency|default:"—" }}</td>
+      <td class="py-1.5 px-3">{{ r.moq|default:"" }}</td>
+      <td class="py-1.5 px-3 whitespace-nowrap">{{ r.quote_date|date:"Y-m-d" }}</td>
+      <td class="py-1.5 px-3 text-xs"><a class="text-blue-700 hover:underline" href="{% url 'sources:original' r.source_file_id %}" title="下载原件">{{ r.source_file.original_name }}</a> · {{ r.locator }}</td>
+    </tr>
+  {% endwith %}{% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="mb-4 text-xs text-slate-500">各供应商报价按原币种列出，不换算、不比较大小。</p>
+
+{% if items %}
+<h2 class="font-semibold mb-2">相关条目</h2>
+<ul class="mb-4 rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 text-sm">
+  {% for item in items %}
+  <li class="flex flex-wrap items-center gap-2 px-3 py-2">
+    {% include "archive/_badge.html" %}
+    <a class="text-blue-700 hover:underline" href="{% url 'archive:item' item.pk %}?next={{ request.get_full_path|urlencode }}">#{{ item.pk }} {{ item.record_a.record_key }}{% if item.record_b and item.kind != 'key_change' %} ~ {{ item.record_b.record_key }}{% endif %}</a>
+    <span class="{% if item.status == 'open' %}text-violet-700{% else %}text-slate-500{% endif %}">{{ item.get_status_display }}</span>
+    <span class="text-slate-500">{{ item.triggers|first }}</span>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if history %}
+<h2 class="font-semibold mb-2">决策历史</h2>
+<ul class="text-sm text-slate-600 space-y-1">{% for log in history %}<li>{{ log.at|date:"Y-m-d H:i" }} · {{ log.actor|default:"系统" }} · {{ log.action }}{% if log.review_item_id %} · 条目 #{{ log.review_item_id }}{% endif %}{% if log.payload.note %} · {{ log.payload.note }}{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}

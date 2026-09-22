@@ -99,6 +99,7 @@ class SourceRecord(models.Model):
         PRICE_UPDATE = "price_update", "报价更新"
         INFO_UPDATE = "info_update", "资料更新（非关键字段）"
         KEY_CHANGE = "key_change", "关键字段变化"
+        RESTANDARDIZE = "restandardize", "规则重算"
 
     source_file = models.ForeignKey(SourceFile, verbose_name="资料文件",
                                     on_delete=models.PROTECT, related_name="records")
@@ -114,6 +115,8 @@ class SourceRecord(models.Model):
     )
     change_type = models.CharField("变化类型", max_length=16, choices=ChangeType.choices,
                                    default=ChangeType.NEW)
+    note = models.CharField("版本说明", max_length=200, blank=True,
+                            help_text="规则重算时记下规则版本与变化字段")
 
     # Where in the original file: Excel sheet + row, or PDF page + table + row.
     locator = models.CharField("定位", max_length=120, help_text="如 Sheet1!R12 或 P3/T1/R5")
@@ -159,7 +162,8 @@ class SourceRecord(models.Model):
             models.Index(fields=["part_type", "make", "model"], name="sources_record_block"),
         ]
         constraints = [
-            models.UniqueConstraint(fields=["source_file", "locator"],
+            # A rule rerun re-reads the same row of the same file into a new version.
+            models.UniqueConstraint(fields=["source_file", "locator", "version"],
                                     name="sources_record_unique_locator"),
             models.CheckConstraint(
                 condition=Q(previous__isnull=True) | Q(version__gt=1),

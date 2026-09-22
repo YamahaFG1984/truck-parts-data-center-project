@@ -44,26 +44,38 @@ def enroll(records, *, source_file=None, user=None) -> int:
 
 def advance(records, *, user=None) -> list[Membership]:
     """New versions of known records: the membership follows the latest version. A key
-    field change in a product with other members suspends the membership and opens a
-    key-change item; a person decides whether it still belongs there."""
+    field change (from a new file or a rule rerun) in a product with other members
+    suspends the membership and opens a key-change item; a person decides whether it
+    still belongs there."""
     from apps.sources.services import versions
 
     suspended = []
     for record in records:
         membership = membership_of(record)
         membership.current_record = record
-        if (record.change_type == SourceRecord.ChangeType.KEY_CHANGE
-                and membership.product.memberships.count() > 1):
+        _, changes = versions.diff(versions.snapshot_record(record.previous),
+                                   versions.snapshot_record(record))
+        key_changes = [c for c in changes if c["kind"] == "key"]
+        if (key_changes and membership.product.memberships.count() > 1
+                and not _still_agrees(record, membership, key_changes)):
             membership.status = Membership.Status.SUSPENDED
-            _, changes = versions.diff(versions.snapshot_record(record.previous),
-                                       versions.snapshot_record(record))
-            _open_key_change(record, [c for c in changes if c["kind"] == "key"])
+            _open_key_change(record, key_changes)
             suspended.append(membership)
         membership.save(update_fields=["current_record", "status", "updated_at"])
     if records:
         _log("advance", user, records=[r.pk for r in records],
              suspended=[m.record_key for m in suspended])
     return suspended
+
+
+def settle(records, *, user=None) -> None:
+    """After matching: in products of these records with no suspended member, open pair
+    items whose two records already sit together are answered (a rule rerun that renames
+    a value for every member reopens their pairs; the grouping itself still stands)."""
+    products = {membership_of(r).product for r in records}
+    for product in products:
+        if not product.memberships.filter(status=Membership.Status.SUSPENDED).exists():
+            _close_implied(product, user, None)
 
 
 def membership_of(record: SourceRecord) -> Membership:
@@ -252,15 +264,35 @@ def _refuse_if_judged_different(first: Product, second: Product) -> None:
                 f"已被判为不同产品（条目 #{item.pk}），不能合并；如需合并请先重新审视该决定。")
 
 
-def _close_implied(product: Product, user, source: ReviewItem) -> None:
+def _close_implied(product: Product, user, source: ReviewItem | None) -> None:
     """Open pair items whose two records now sit in the same product are answered."""
     members = _identities(product)
     implied = [i for i in ReviewItem.objects.filter(status=S.OPEN, kind=ReviewItem.Kind.PAIR)
                if i.identity_a in members and i.identity_b in members]
+    why = f"由条目 #{source.pk} 的决定推出" if source else "规则重算后仍在同一产品"
     for item in implied:
-        _decide(item, S.SAME, user, f"由条目 #{source.pk} 的决定推出：两条记录已在 {product.code}")
+        _decide(item, S.SAME, user, f"{why}：两条记录已在 {product.code}")
     if implied:
         _log("implied_same", user, source, product=product.code, items=[i.pk for i in implied])
+
+
+def _still_agrees(record: SourceRecord, membership: Membership, changes: list[dict]) -> bool:
+    """A rule rerun that changes a key field the same way for every member (a renamed
+    part type, say) needs no review. A change from the supplier always does."""
+    from apps.sources.services import versions
+
+    if record.change_type != SourceRecord.ChangeType.RESTANDARDIZE:
+        return False
+    fields = [c["field"] for c in changes]
+    mine = versions.snapshot_record(record)
+    others = membership.product.memberships.exclude(pk=membership.pk)
+    for other in others:  # the other member's latest version: a rerun writes all first
+        latest = (SourceRecord.objects.current().prefetch_related("numbers")
+                  .get(supplier_id=other.supplier_id, record_key=other.record_key))
+        theirs = versions.snapshot_record(latest)
+        if any(mine[f] != theirs[f] for f in fields):
+            return False
+    return True
 
 
 def _open_key_change(record: SourceRecord, changes: list[dict]) -> ReviewItem:
@@ -276,7 +308,9 @@ def _open_key_change(record: SourceRecord, changes: list[dict]) -> ReviewItem:
     return ReviewItem.objects.create(
         kind=ReviewItem.Kind.KEY_CHANGE, category=ReviewItem.Category.KEY_CHANGE,
         strength="conflict", record_a=record, record_b=previous, identity_a=identity,
-        triggers=[f"v{previous.version} → v{record.version} 关键字段变化：" + "；".join(
+        triggers=[f"v{previous.version} → v{record.version} "
+                  + ("规则重算后" if record.change_type == "restandardize" else "")
+                  + "关键字段变化：" + "；".join(
             f"{c['label']} {c['old'] or '（空）'} → {c['new'] or '（空）'}" for c in changes)],
         conflicts=[{"field": FIELD_ROW.get(c["field"], c["field"]), "label": c["label"],
                     "a": {"value": c["new"], "record": record.pk},

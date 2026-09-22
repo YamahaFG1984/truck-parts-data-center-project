@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}{{ record.supplier.name }} {{ record.record_key }} · 来源记录{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{% url 'archive:search' %}" class="hover:text-blue-700">档案查询</a> / <a href="{% url 'archive:product' membership.product_id %}" class="hover:text-blue-700">{{ membership.product.code }}</a> / {{ record.record_key }}</nav>
+<div class="flex flex-wrap items-center gap-3 mb-1">
+  <h1 class="text-2xl font-bold">{{ record.supplier.name }} · {{ record.record_key }}</h1>
+  <span class="text-sm rounded bg-slate-100 px-2 py-0.5">v{{ record.version }} · {{ record.get_change_type_display }}</span>
+  {% if not is_current %}<span class="text-sm rounded bg-amber-100 text-amber-800 px-2 py-0.5">历史版本</span>{% endif %}
+</div>
+<p class="mb-4 text-sm text-slate-500">身份来源：{{ record.get_key_kind_display }} · 原件 <a class="text-blue-700 hover:underline" href="{% url 'sources:original' record.source_file_id %}">{{ record.source_file.original_name }}</a>（<a class="text-blue-700 hover:underline" href="{% url 'sources:detail' record.source_file_id %}">#{{ record.source_file_id }}</a>）· 定位 <b>{{ record.locator }}</b>{% if record.note %} · {{ record.note }}{% endif %}</p>
+
+{% if hints %}
+<section class="mb-4 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-sm">
+  <b>相似但未配对：</b>
+  <ul class="list-disc ml-5">{% for h in hints %}<li>{{ h }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+<div class="grid gap-4 lg:grid-cols-2 mb-4">
+<section class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3 w-28">标准字段</th><th class="py-2 px-3">取值与出处</th></tr></thead>
+  <tbody>
+  {% for c in rows %}
+    <tr class="border-t border-slate-100 align-top"><td class="py-1.5 px-3 text-slate-500">{{ c.label }}</td>{% include "archive/_cell.html" %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+</section>
+<section class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-2 px-3">原表头</th><th class="py-2 px-3">单元格</th><th class="py-2 px-3">原文</th></tr></thead>
+  <tbody>
+  {% for header, coord, text in raw %}
+    <tr class="border-t border-slate-100 align-top"><td class="py-1.5 px-3 text-slate-500">{{ header }}</td><td class="py-1.5 px-3 text-xs text-slate-400">{{ coord }}</td><td class="py-1.5 px-3">{{ text }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</section>
+</div>
+
+{% if record.warnings or missing %}
+<section class="mb-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
+  {% if missing %}<p><b>缺失：</b>{{ missing|join:"、" }}</p>{% endif %}
+  {% if record.warnings %}<ul class="list-disc ml-5">{% for w in record.warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+</section>
+{% endif %}
+
+<h2 class="font-semibold mb-2">版本</h2>
+<ul class="text-sm text-slate-600 space-y-1">
+  {% for v in versions %}<li>{% if v.pk == record.pk %}<b>v{{ v.version }}</b>{% else %}<a class="text-blue-700 hover:underline" href="{% url 'archive:record' v.pk %}">v{{ v.version }}</a>{% endif %} · {{ v.get_change_type_display }} · {{ v.source_file.original_name }} {{ v.locator }} · {{ v.created_at|date:"Y-m-d H:i" }}{% if v.note %} · {{ v.note }}{% endif %}</li>{% endfor %}
+</ul>
+{% endblock %}
