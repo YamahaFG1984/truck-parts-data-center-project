@@ -11,6 +11,7 @@ urlpatterns = [
     path("", include("apps.ai.urls")),
     path("", include("apps.inquiries.urls")),
     path("", include("apps.sources.urls")),
+    path("", include("apps.archive.urls")),
     path("", include("apps.core.urls")),
 ]
 

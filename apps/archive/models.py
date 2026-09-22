@@ -16,9 +16,13 @@ class Product(TimeStampedModel):
         UNREVIEWED = "unreviewed", "待核"
         GROUPED = "grouped", "已确认归一"
         INDEPENDENT = "independent", "已确认独立"
+        MERGED = "merged", "已并入其他产品"
 
     status = models.CharField("状态", max_length=16, choices=Status.choices,
                               default=Status.UNREVIEWED, db_default=Status.UNREVIEWED)
+    merged_into = models.ForeignKey("self", verbose_name="并入", null=True, blank=True,
+                                    on_delete=models.PROTECT, related_name="absorbed",
+                                    help_text="合并后保留编号，指向接收它的产品")
     needs_info = models.BooleanField("待补充", default=False)
     missing_fields = models.JSONField("待补充字段", default=list, blank=True)
     note = models.TextField("备注", blank=True)

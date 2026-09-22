@@ -1,0 +1,5 @@
+<td class="py-1.5 px-3 {% if c.flag == 'conflict' %}bg-red-50{% elif c.flag == 'missing' %}bg-amber-50{% endif %}">
+  {% if c.text %}<span class="{% if c.flag == 'conflict' %}text-red-800 font-medium{% endif %}">{{ c.text }}</span>{% elif c.flag == 'missing' %}<span class="text-amber-700">缺</span>{% else %}<span class="text-slate-300">—</span>{% endif %}
+  {% if c.source %}<div class="text-xs text-slate-400" title="原文：{{ c.raw }}">{{ c.source }}{% if c.raw and c.raw != c.text %} · 原文“{{ c.raw|truncatechars:40 }}”{% endif %}</div>{% endif %}
+  {% for w in c.warnings %}<div class="text-xs text-amber-700">{{ w }}</div>{% endfor %}
+</td>

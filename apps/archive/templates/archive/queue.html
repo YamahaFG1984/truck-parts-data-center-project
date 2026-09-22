@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}归一复核 · 卡车配件 AI 产品数据中心{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-1">归一复核</h1>
+<p class="text-sm text-slate-500 mb-4">系统只提出"可能是同一件"的配对并摆出证据，<b>是否归一由你决定</b>。互相连着的配对聚成一组，一次看完一组；每个决定都记入决策日志，合并可以撤销。已处理 {{ decided }} 条。</p>
+
+<form method="get" class="mb-4 flex flex-wrap items-center gap-2 text-sm">
+  <select name="category" class="rounded border border-slate-300 px-2 py-1">
+    <option value="">全部类别</option>
+    {% for value, label, count in categories %}{% if count %}<option value="{{ value }}"{% if params.category == value %} selected{% endif %}>{{ label }}（{{ count }}）</option>{% endif %}{% endfor %}
+  </select>
+  <select name="supplier" class="rounded border border-slate-300 px-2 py-1">
+    <option value="">全部供应商</option>
+    {% for s in suppliers %}<option value="{{ s.pk }}"{% if params.supplier == s.pk|stringformat:"d" %} selected{% endif %}>{{ s.name }}</option>{% endfor %}
+  </select>
+  <button class="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50">筛选</button>
+  {% if params %}<a href="{% url 'archive:queue' %}" class="text-blue-700 hover:underline">清除</a>{% endif %}
+</form>
+
+<form method="post" action="{% url 'archive:bulk_confirm' %}">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+  <div class="mb-3 flex items-center gap-3 text-sm">
+    <button type="submit" class="rounded bg-emerald-700 px-4 py-1.5 text-white hover:bg-emerald-800">批量确认所选强证据</button>
+    <span class="text-slate-500">只有强证据条目能勾选；每条仍单独记入决策日志。</span>
+  </div>
+
+  {% for cluster in clusters %}
+  <section class="mb-4 rounded-lg border {% if cluster.has_conflict %}border-red-200{% else %}border-slate-200{% endif %} bg-white">
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-left text-slate-500"><tr><th class="py-1.5 px-3">供应商 · 记录</th><th class="py-1.5 px-3">品类 / 位置</th><th class="py-1.5 px-3">适配</th><th class="py-1.5 px-3">尺寸 cm</th><th class="py-1.5 px-3">报价</th></tr></thead>
+      <tbody>
+      {% for r in cluster.records %}
+        <tr class="border-t border-slate-100">
+          <td class="py-1 px-3 whitespace-nowrap">{{ r.supplier.name }} · <b>{{ r.record_key }}</b> <span class="text-xs text-slate-400">{{ r.supplier_sku }}</span></td>
+          <td class="py-1 px-3">{{ r.part_type }}{% if r.position %} · <b>{{ r.position }}</b>{% endif %}</td>
+          <td class="py-1 px-3">{{ r.make }} {{ r.model }}{% if r.year_from %} {{ r.year_from }}–{{ r.year_to|default:"" }}{% endif %}</td>
+          <td class="py-1 px-3 whitespace-nowrap">{% if r.dim_l_cm %}{{ r.dim_l_cm|floatformat:"-2" }}×{{ r.dim_w_cm|floatformat:"-2" }}×{{ r.dim_h_cm|floatformat:"-2" }}{% endif %}</td>
+          <td class="py-1 px-3 whitespace-nowrap">{% if r.price is not None %}{{ r.price|floatformat:"-2" }} {{ r.currency }}{% else %}<span class="text-red-600">无</span>{% endif %}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <ul class="border-t border-slate-200 divide-y divide-slate-100">
+      {% for item in cluster.items %}
+      <li class="flex flex-wrap items-center gap-2 px-3 py-2 text-sm">
+        {% if item.strength == "strong" %}<input type="checkbox" name="items" value="{{ item.pk }}" aria-label="选择条目 {{ item.pk }}">{% else %}<span class="inline-block w-[13px]"></span>{% endif %}
+        {% include "archive/_badge.html" %}
+        <span class="font-medium">{{ item.record_a.record_key }} ~ {{ item.record_b.record_key }}</span>
+        <span class="text-slate-500">{{ item.triggers|first }}</span>
+        {% for c in item.conflicts %}<span class="text-red-700">{{ c.label }} {{ c.a.value }} ≠ {{ c.b.value }}</span>{% endfor %}
+        {% for m in item.missing %}{% if m.field != "oe_numbers" %}<span class="text-amber-700">缺{{ m.label }}</span>{% endif %}{% endfor %}
+        <a href="{% url 'archive:item' item.pk %}?next={{ request.get_full_path|urlencode }}" class="ml-auto text-blue-700 hover:underline whitespace-nowrap">对照 →</a>
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% empty %}
+  <p class="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-slate-400">没有待确认的配对。</p>
+  {% endfor %}
+</form>
+
+{% if singles %}
+<h2 class="font-semibold mt-6 mb-2">待补充的记录（{{ singles|length }}）</h2>
+<ul class="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 text-sm">
+  {% for item in singles %}
+  <li class="flex flex-wrap items-center gap-2 px-3 py-2">
+    {% include "archive/_badge.html" %}
+    <span class="font-medium">{{ item.record_a.supplier.name }} · {{ item.record_a.record_key }}</span>
+    <span class="text-slate-500">{{ item.record_a.part_type }}</span>
+    <span class="text-amber-700">{{ item.triggers|first }}</span>
+    <a href="{% url 'archive:item' item.pk %}?next={{ request.get_full_path|urlencode }}" class="ml-auto text-blue-700 hover:underline">处理 →</a>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endblock %}

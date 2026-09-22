@@ -1,0 +1,4 @@
+{% if item.strength == "strong" %}<span class="rounded bg-emerald-100 text-emerald-800 px-2 py-0.5 text-xs whitespace-nowrap">{{ item.get_category_display }}</span>
+{% elif item.strength == "conflict" %}<span class="rounded bg-red-100 text-red-800 px-2 py-0.5 text-xs whitespace-nowrap">{{ item.get_category_display }}</span>
+{% elif item.strength == "medium" %}<span class="rounded bg-sky-100 text-sky-800 px-2 py-0.5 text-xs whitespace-nowrap">{{ item.get_category_display }}</span>
+{% else %}<span class="rounded bg-amber-100 text-amber-800 px-2 py-0.5 text-xs whitespace-nowrap">{{ item.get_category_display }}</span>{% endif %}

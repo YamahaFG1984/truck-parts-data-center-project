@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}条目 #{{ item.pk }} · 归一复核{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500 mb-3"><a href="{{ next }}" class="hover:text-blue-700">归一复核</a> / 条目 #{{ item.pk }}</nav>
+<div class="flex flex-wrap items-center gap-3 mb-2">
+  <h1 class="text-2xl font-bold">{{ item.record_a.record_key }}{% if item.record_b %} ~ {{ item.record_b.record_key }}{% endif %}</h1>
+  {% include "archive/_badge.html" %}
+  <span class="text-sm {% if item.status == 'open' %}text-violet-700{% else %}text-slate-500{% endif %}">{{ item.get_status_display }}</span>
+</div>
+<ul class="mb-3 text-sm text-slate-600 list-disc ml-5">{% for t in item.triggers %}<li>{{ t }}</li>{% endfor %}</ul>
+<p class="mb-4 rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm"><b>建议动作：</b>{{ item.suggested_action }}</p>
+
+<div class="overflow-x-auto rounded-lg border border-slate-200 bg-white mb-4">
+<table class="w-full text-sm">
+  <thead class="bg-slate-50 text-left text-slate-500"><tr>
+    <th class="py-2 px-3 w-28">字段</th>
+    {% for side, m in members.items %}<th class="py-2 px-3">{% if side == "a" %}{{ item.record_a.supplier.name }} · {{ item.record_a.record_key }}{% else %}{{ item.record_b.supplier.name }} · {{ item.record_b.record_key }}{% endif %}
+      <div class="text-xs font-normal">{{ m.product.code }} · {{ m.product.get_status_display }} · {{ m.size }} 条成员</div></th>{% endfor %}
+  </tr></thead>
+  <tbody>
+  {% for row in rows %}
+    <tr class="border-t border-slate-100 align-top">
+      <td class="py-1.5 px-3 text-slate-500">{{ row.label }}</td>
+      {% with c=row.a %}{% include "archive/_cell.html" %}{% endwith %}
+      {% if item.record_b %}{% with c=row.b %}{% include "archive/_cell.html" %}{% endwith %}{% endif %}
+    </tr>
+  {% endfor %}
+    <tr class="border-t border-slate-100 text-xs text-slate-500">
+      <td class="py-1.5 px-3">出处</td>
+      <td class="py-1.5 px-3"><a class="text-blue-700 hover:underline" href="{% url 'sources:detail' item.record_a.source_file_id %}">{{ item.record_a.source_file.original_name }}</a> · {{ item.record_a.locator }}</td>
+      {% if item.record_b %}<td class="py-1.5 px-3"><a class="text-blue-700 hover:underline" href="{% url 'sources:detail' item.record_b.source_file_id %}">{{ item.record_b.source_file.original_name }}</a> · {{ item.record_b.locator }}</td>{% endif %}
+    </tr>
+  </tbody>
+</table>
+</div>
+
+{% if item.status == "open" %}
+<form method="post" class="rounded-lg border border-slate-200 bg-white p-4 mb-4">
+  {% csrf_token %}
+  <input type="hidden" name="next" value="{{ next }}">
+  <label class="block text-sm text-slate-600 mb-1" for="note">依据（会记入决策日志）</label>
+  <textarea id="note" name="note" rows="2" class="w-full rounded border border-slate-300 px-3 py-2 text-sm mb-3" placeholder="例如：已对照供应商目录图片，确认是同一件"></textarea>
+  <div class="flex flex-wrap gap-2">
+    {% if item.kind == "pair" %}
+      <button name="action" value="same" class="rounded bg-emerald-700 px-4 py-1.5 text-white hover:bg-emerald-800">确认是同一产品</button>
+      <button name="action" value="different" class="rounded bg-slate-700 px-4 py-1.5 text-white hover:bg-slate-800">判为不同产品</button>
+    {% else %}
+      <button name="action" value="needs_info" class="rounded bg-amber-600 px-4 py-1.5 text-white hover:bg-amber-700">标记待补充</button>
+      <button name="action" value="independent" class="rounded bg-slate-700 px-4 py-1.5 text-white hover:bg-slate-800">确认独立（信息够用）</button>
+    {% endif %}
+  </div>
+</form>
+{% else %}
+<p class="mb-4 text-sm text-slate-600">已于 {{ item.decided_at|date:"Y-m-d H:i" }} 由 {{ item.decided_by|default:"系统" }} 决定：<b>{{ item.get_status_display }}</b>{% if item.note %}。依据：{{ item.note }}{% endif %}</p>
+{% endif %}
+
+{% if same_product %}
+<section class="rounded-lg border border-amber-200 bg-amber-50 p-4 mb-4 text-sm">
+  <p class="mb-2">这两条记录目前在同一产品 {{ members.a.product.code }} 中。如果合并有误，可以把其中一条移出（相关配对会重新进入待确认）：</p>
+  <div class="flex flex-wrap gap-2">
+    {% for side, m in members.items %}
+    <form method="post" action="{% url 'archive:detach' m.pk %}">{% csrf_token %}<input type="hidden" name="next" value="{{ next }}">
+      <button class="rounded border border-amber-600 px-3 py-1 text-amber-800 hover:bg-amber-100">移出 {{ m.record_key }}</button></form>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if history %}
+<h2 class="font-semibold mb-2">决策日志</h2>
+<ul class="text-sm text-slate-600 space-y-1">{% for log in history %}<li>{{ log.at|date:"Y-m-d H:i" }} · {{ log.actor|default:"系统" }} · {{ log.action }}{% if log.payload.note %} · {{ log.payload.note }}{% endif %}</li>{% endfor %}</ul>
+{% endif %}
+{% endblock %}
