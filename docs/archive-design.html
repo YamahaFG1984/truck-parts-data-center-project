@@ -587,9 +587,9 @@
 <h2 id="s13">13. 后续维护</h2>
 <ul>
 <li><b>新供应商或新文件</b>：上传后首次确认列映射，存为该供应商的模板；之后同格式文件直接预检、入库。</li>
-<li><b>规则调整</b>：词表改 <code>vocabulary.json</code>，匹配参数改 <code>matching.json</code>，评审后运行 <code>archive_rematch</code>；已决条目不受影响，证据变化的条目自动重开。</li>
+<li><b>规则调整</b>：词表改 <code>vocabulary.json</code>，匹配参数改 <code>matching.json</code>，评审后运行 <code>archive_rematch</code>（词表改动先 <code>--restandardize</code> 预演、再 <code>--commit</code>，见 §10）；已决条目证据不变就不受影响，证据变化的条目自动重开。</li>
 <li><b>人工确认的回写</b>：在复核台操作，决定立即生效并写入审计日志；重新导入时自动沿用。</li>
-<li><b>命令行</b>：<code>archive_import &lt;文件&gt; --supplier &lt;名称&gt;</code>、<code>archive_export</code>，用于批量处理与现场演示。</li>
+<li><b>命令行</b>：<code>archive_import &lt;文件&gt; --supplier &lt;名称&gt;</code>、<code>archive_export</code>，用于批量处理与现场演示；<code>scripts/archive_demo.sh</code> 一条命令从空库产出三份导出。给评审的简短版见 <a href="archive-guide.html">交付说明</a>。</li>
 </ul>
 
 <h2 id="s14">14. 施工计划 M21–M29</h2>

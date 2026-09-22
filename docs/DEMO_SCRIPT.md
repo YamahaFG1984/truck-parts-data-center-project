@@ -129,3 +129,76 @@ bash scripts/demo_up.sh --reset      # 数据库、演示数据、演示账号�
 | 端口被占 | `PORT=8001 bash scripts/demo_up.sh`。 |
 | 数据被现场操作改乱 | `python manage.py seed_demo --reset` 一条命令回到初始状态（约 20 秒）。 |
 | 导入向导卡在列映射 | 手动选字段即可，AI 只是建议；`LLM_PROVIDER=mock` 时用的是同义词表。 |
+
+---
+
+# 第二阶段：可追溯归档与归一化
+
+给评审演示"供应商资料 → 可追溯档案 → 人工确认的归一 → 三份导出"。说明文档见
+[docs/archive-guide.html](archive-guide.html)。下文的样例全部是合成数据；公司提供的资料放在 `extra/`，不进仓库。
+
+## 开演前
+
+```bash
+bash scripts/archive_demo.sh --synthetic   # 空库 → 导入 X、Y 两份合成资料 → 匹配 → 导出到 demo-output/
+bash scripts/archive_demo.sh               # 有 extra/ 公司样例时用它，结果写到 extra/output/
+```
+
+脚本最后会打印一条 `DATABASE_URL=… manage.py runserver` 命令：用它启动服务器，页面上就是这批数据。
+登录 `archive_demo / archive-demo-local`（仅本机）。陌生资料在 `demo-output/samples/03`–`05`。
+
+## 1. 结果先看（1 分钟）· 三份导出
+
+- 打开 `demo-output/主数据.xlsx`：一行一个产品，成员不一致的字段写"冲突：…"，最后一列是每个成员的文件与定位。
+- `供应商报价.xlsx`：GBP、EUR、USD 各自原样，缺币种的是空格，不是 USD。
+- `待人工确认清单.xlsx`：每条都有触发原因、冲突两边取值、建议动作。
+
+**说**：机器只提出"可能是同一件"并摆出证据，归一全部由人点。
+
+## 2. 复核（2 分钟）· `/archive/review/`
+
+- 强证据一组：勾选 → 批量确认（每条单独进日志）。
+- 位置冲突（共享 OE、左右不同）：打开对照页，冲突标红，每个值下方是列名、单元格、原文 → 判为不同。
+- 合并错了：对照页底部"移出"，相关配对重新进入待确认。
+
+## 3. 陌生资料演练（每一处人工步骤的入口）
+
+| 步骤 | 资料 | 做法 | 人工入口 |
+|---|---|---|---|
+| a | `03_supplier_z_offer.xlsx`（新供应商，标题行在表头上方，`Item Code`、`L/R` 两列不在同义词表，尺寸是 mm） | 页面：资料归档 → 上传 → 列映射页把两列分别选为"供应商料号 / 品牌号""安装位置"。命令：`archive_import … --supplier "Supplier Z"` 先预检，看到两列是 `ignore` 和"没有供应商料号列"的警告，再加 `--map "Item Code=supplier_sku" --map "L/R=position" --commit` | 列映射页 / `--map` |
+| b | 同上，预检 | 看 mm → cm 的换算、`R` → Right、GBP 原样 | 预检页"确认入库"按钮 / `--commit` |
+| c | `04_supplier_w_catalog.pdf`（PDF 表格） | 上传后工作表名是"表1（第1页）"，定位为 `P1/T1/R2`；缺价格、币种的行进"待补充" | 同 a、b |
+| d | `05_supplier_x_update.xlsx`（X 的新一版） | 预检逐行显示：报价更新 1、资料更新 1、关键字段变化 1（位置 Left → Right）、新增 1、未变 7、本次未出现 1 | 预检页确认 |
+| e | 关键字段变化 | 若 X-002 已与别家归一，成员关系暂停，复核台出现"关键字段变化"条目（新版本 vs 旧版本）→ 保留或移出 | 复核台 |
+| f | 查询 | `/archive/` 输入 `oe tst 1001`、`side grille`、`Supplier Z`；点产品看成员报价与出处，点记录看整行原文与"相似但未配对"提示 | 档案查询 |
+| g | 导出 | 档案查询页底部三个按钮，或 `archive_export --out 目录` | — |
+
+命令行版（在 `archive_demo.sh` 生成的库上）：
+
+```bash
+export DATABASE_URL=sqlite:///$PWD/demo-output/archive_demo.sqlite3
+S=demo-output/samples
+python manage.py archive_import $S/03_supplier_z_offer.xlsx --supplier "Supplier Z" --user archive_demo
+python manage.py archive_import $S/03_supplier_z_offer.xlsx --supplier "Supplier Z" --user archive_demo \
+  --map "Item Code=supplier_sku" --map "L/R=position" --commit
+python manage.py archive_import $S/04_supplier_w_catalog.pdf --supplier "Supplier W" --user archive_demo --commit
+python manage.py archive_import $S/05_supplier_x_update.xlsx --supplier "Supplier X" --user archive_demo --commit
+python manage.py archive_export --out demo-output/after-rehearsal
+```
+
+## 4. 现场拿到真正没见过的资料
+
+1. 资料归档页上传（或 `archive_import 文件 --supplier 名称`，不加 `--commit`）。解析失败时原件照样存档，详情页写明原因。
+2. 列映射：同义词认不出的列先看大模型建议（`.env` 配了真实模型时）；不对就手选，至少要有料号、OE 或品名之一。
+3. 预检：看警告（币种与格式矛盾、无单位尺寸、缺年份）和缺失，确认后入库。
+4. 复核台处理新出现的条目；导出三份结果。
+5. 品类不在词表里：先照原文入库；会后补 `vocabulary.json`，`archive_rematch --restandardize` 预演、`--commit` 生效。
+
+## 常见追问
+
+| 问题 | 一句话 |
+|---|---|
+| 为什么不自动合并强证据？ | 需求明确"不能只凭共享 OE 合并"；强证据只是排在前面、可批量确认，每条仍记人和时间。 |
+| 原件改过怎么办？ | 原件不改；新文件是新的存档，逐行对比出新版本，旧版本保留。 |
+| 两家报价币种不同能比价吗？ | 不换算、不比较；产品页并列展示原币种报价。 |
+| 词表或规则改了，旧数据怎么办？ | `archive_rematch --restandardize` 从原件重算，变化写成新版本；已做的决定证据不变就不动。 |

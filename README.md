@@ -37,6 +37,23 @@ bash scripts/demo_up.sh
 
 演示怎么讲，见 [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md)。
 
+## 第二阶段：可追溯归档与归一化
+
+把不同供应商、格式各异的报价资料（Excel、CSV、PDF）整理成可查询、可核对、可导出的产品档案：
+原件只读留存，每个字段记下来自原件的哪一格；"是不是同一个产品"一律由人在复核台决定；
+新一版资料进来逐行分出新增、报价更新、关键字段变化；报价保留原币种。
+
+```bash
+bash scripts/archive_demo.sh --synthetic   # 空库 → 导入两份合成资料 → 匹配 → 导出三份 xlsx 到 demo-output/
+```
+
+- 页面：资料归档 `/sources/`、归一复核 `/archive/review/`、档案查询 `/archive/`
+- 命令：`archive_import`（非交互导入，默认只预检）、`archive_export`、`archive_rematch [--restandardize]`
+- 代码：`apps/sources`（原件、来源记录、字段出处、版本）、`apps/archive`（匹配、复核、查询、导出）
+- 文档：[交付说明](docs/archive-guide.html) · [设计与施工方案](docs/archive-design.html) · [演练清单](docs/DEMO_SCRIPT.md#第二阶段可追溯归档与归一化)
+
+公司提供的面试资料放在 `extra/`，已在 `.gitignore` 中，不进仓库；测试与演示只用合成数据。
+
 ## 手动安装
 
 ```bash
@@ -98,7 +115,10 @@ apps/
   inquiries/   Inquiry / QuoteLine；图片询价、询价留痕、报价单 xlsx、平台导出 csv
 config/settings/   base / local / test / production 分层
 docs/          PRD、架构、数据字典、施工进度、面试陈述稿（GitHub Pages）
-scripts/       demo_up.sh 一键演示、make_supplier_excel.py 乱格式报价单、gen_diagrams.py 文档配图
+  sources/     第二阶段：SourceFile / SourceRecord / RecordNumber；读取、列映射、标准化、增量导入
+  archive/     第二阶段：Product / Membership / ReviewItem；匹配、人工复核、查询、导出
+scripts/       demo_up.sh 一键演示、archive_demo.sh 第二阶段演示、make_archive_samples.py 合成样例、
+               make_supplier_excel.py 乱格式报价单、gen_diagrams.py 文档配图
 ```
 
 约定：业务逻辑放 `services/` 与自定义 `QuerySet`，视图保持薄；界面中文、字段英文、USD 单币种；
@@ -114,6 +134,8 @@ scripts/       demo_up.sh 一键演示、make_supplier_excel.py 乱格式报价�
 - [docs/data-dictionary.html](docs/data-dictionary.html) — 标准字段规范与各品牌编号格式
 - [docs/schedule.html](docs/schedule.html) — 20 个里程碑的施工进度表与验收命令
 - [docs/pitch.html](docs/pitch.html) — 面试陈述稿与预设问答
+- [docs/archive-guide.html](docs/archive-guide.html) — 第二阶段交付说明（给评审）
+- [docs/archive-design.html](docs/archive-design.html) — 第二阶段设计与施工方案
 
 ## 安全与数据边界
 

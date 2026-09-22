@@ -27,7 +27,8 @@ class Command(BaseCommand):
             if not options["commit"]:
                 return
         counts = rematch()
-        labels = dict(ReviewItem.Category.choices)
+        labels = dict(ReviewItem.Category.choices) | {"removed": "移除的过期条目",
+                                                      "decided": "已决且证据未变"}
         self.stdout.write(f"规则版本 {rules()['version']}")
         for key, value in sorted(counts.items()):
             self.stdout.write(f"  {labels.get(key, key)}：{value}")

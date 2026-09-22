@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>归档与归一化 · 交付说明</title>
+<meta name="description" content="给评审看的简短说明：数据模型、处理流程、疑似同一的依据、出处留存、自动与人工的分界、持续维护与演示方式。">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="in">
+  <a class="brand" href="index.html">卡车配件 AI 产品数据中心</a>
+  <nav>
+    <a href="index.html">总览</a>
+    <a class="active" href="archive-guide.html">交付说明</a>
+    <a href="archive-design.html">归档与归一化</a>
+    <a href="manual.html">使用说明</a>
+    <a href="search-design.html">智能搜索</a>
+    <a href="schedule.html">施工进度</a>
+  </nav>
+</div></header>
+<main>
+<h1>零件资料的可追溯归档与归一化 · 交付说明</h1>
+<p class="lede">把不同供应商、格式各异的零件报价资料（Excel、CSV、PDF）整理成可查询、可核对、可导出的产品档案。<b>原件永不覆盖，每个字段都能回看到原件的哪一格，"是不是同一个产品"一律由人决定</b>，新资料进来能分清新增、更新与冲突。</p>
+<p class="meta">v1.0 · 2026-09-22 · 代码：<code>apps/sources</code>（资料与出处）、<code>apps/archive</code>（归一与复核）· 详细设计见 <a href="archive-design.html">归档与归一化设计</a></p>
+
+<div class="toc"><b>目录</b><ol>
+<li><a href="#g1">一条命令看结果</a></li>
+<li><a href="#g2">数据模型</a></li>
+<li><a href="#g3">处理流程</a></li>
+<li><a href="#g4">疑似同一的依据</a></li>
+<li><a href="#g5">出处如何留存</a></li>
+<li><a href="#g6">哪些自动、哪些人工</a></li>
+<li><a href="#g7">如何持续维护</a></li>
+<li><a href="#g8">页面与命令入口</a></li>
+<li><a href="#g9">局限与不做的事</a></li>
+</ol></div>
+
+<h2 id="g1">1. 一条命令看结果</h2>
+<pre><code>bash scripts/archive_demo.sh              # 空库 → 导入两份资料 → 匹配 → 导出三份结果
+bash scripts/archive_demo.sh --synthetic  # 只用仓库里的合成样例</code></pre>
+<p>脚本用独立的 SQLite 空库，不碰日常数据库。产出三份 xlsx：</p>
+<div class="tbl narrow"><table>
+<tr><th>文件</th><th>一行是</th><th>要点</th></tr>
+<tr><td>主数据.xlsx</td><td>一个归一产品</td><td>品类、位置、适配、尺寸、OE 汇总；成员不一致标"冲突"；各供应商料号；待补充字段；每个成员的出处</td></tr>
+<tr><td>供应商报价.xlsx</td><td>一条来源记录的当前版本</td><td>价格按<b>原币种</b>，不换算、不加总、缺了不补默认值；原始文件、工作表 / 页、行号、定位</td></tr>
+<tr><td>待人工确认清单.xlsx</td><td>一个未决条目</td><td>类别、强度、两条记录及定位、触发原因、冲突字段两边取值、缺失字段、建议动作</td></tr>
+</table></div>
+
+<h2 id="g2">2. 数据模型</h2>
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 250" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="原件、来源记录、归一产品三层，复核条目和决策日志连接后两层">
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker></defs>
+<rect class="box ext" x="20" y="30" width="250" height="110" rx="8"/>
+<text x="145" y="58" text-anchor="middle" font-weight="600">原件 SourceFile</text>
+<text x="145" y="82" text-anchor="middle" class="small">原样存档、只读，sha256 去重</text>
+<text x="145" y="100" text-anchor="middle" class="small">列映射（人确认）与读取统计</text>
+<text x="145" y="118" text-anchor="middle" class="small">随时可下载原文件</text>
+<rect class="box" x="355" y="30" width="250" height="110" rx="8"/>
+<text x="480" y="58" text-anchor="middle" font-weight="600">来源记录 SourceRecord</text>
+<text x="480" y="82" text-anchor="middle" class="small">原件的一行：定位 + 整行原文</text>
+<text x="480" y="100" text-anchor="middle" class="small">标准字段各带出处（列、单元格、原文）</text>
+<text x="480" y="118" text-anchor="middle" class="small">写入后不可改；更新 = 新版本</text>
+<rect class="box good" x="690" y="30" width="250" height="110" rx="8"/>
+<text x="815" y="58" text-anchor="middle" font-weight="600">归一产品 Product</text>
+<text x="815" y="82" text-anchor="middle" class="small">成员 Membership = 供应商 + 记录身份</text>
+<text x="815" y="100" text-anchor="middle" class="small">待核 / 已确认归一 / 已确认独立</text>
+<text x="815" y="118" text-anchor="middle" class="small">每家供应商报价各自保留</text>
+<path class="arrow" d="M270,85 L355,85"/>
+<path class="arrow" d="M605,85 L690,85"/>
+<rect class="box warn2" x="355" y="175" width="250" height="56" rx="8"/>
+<text x="480" y="199" text-anchor="middle" font-weight="600">复核条目 ReviewItem</text>
+<text x="480" y="217" text-anchor="middle" class="small">证据、冲突、缺失、建议动作</text>
+<rect class="box soft" x="690" y="175" width="250" height="56" rx="8"/>
+<text x="815" y="199" text-anchor="middle" font-weight="600">决策日志 DecisionLog</text>
+<text x="815" y="217" text-anchor="middle" class="small">谁、何时、做了什么、依据</text>
+<path class="arrow" d="M480,140 L480,175"/>
+<path class="arrow" d="M605,203 L690,203"/>
+<path class="arrow" d="M815,175 L815,140"/>
+</svg>
+<figcaption>图 1 · 三层数据。原件和来源记录只增不改；归一关系只经复核服务（<code>apps/archive/services/review.py</code>）写入，有守卫测试拦住其他写入。</figcaption>
+</figure>
+
+<h2 id="g3">3. 处理流程</h2>
+<figure class="svg-diagram">
+<svg viewBox="0 0 960 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="上传、解析、列映射、标准化、预检、入库、匹配、复核、查询导出九步，其中列映射、预检入库、复核由人确认">
+<rect class="box" x="10" y="40" width="92" height="56" rx="8"/><text x="56" y="64" text-anchor="middle">上传存档</text><text x="56" y="82" text-anchor="middle" class="small">哈希去重</text>
+<rect class="box" x="116" y="40" width="92" height="56" rx="8"/><text x="162" y="64" text-anchor="middle">解析定位</text><text x="162" y="82" text-anchor="middle" class="small">表头行、页、行</text>
+<rect class="box warn2" x="222" y="40" width="92" height="56" rx="8"/><text x="268" y="64" text-anchor="middle">列映射</text><text x="268" y="82" text-anchor="middle" class="small">人确认</text>
+<rect class="box" x="328" y="40" width="92" height="56" rx="8"/><text x="374" y="64" text-anchor="middle">标准化</text><text x="374" y="82" text-anchor="middle" class="small">带出处与警告</text>
+<rect class="box warn2" x="434" y="40" width="92" height="56" rx="8"/><text x="480" y="64" text-anchor="middle">预检入库</text><text x="480" y="82" text-anchor="middle" class="small">人确认</text>
+<rect class="box" x="540" y="40" width="92" height="56" rx="8"/><text x="586" y="64" text-anchor="middle">版本对比</text><text x="586" y="82" text-anchor="middle" class="small">新增 / 更新</text>
+<rect class="box" x="646" y="40" width="92" height="56" rx="8"/><text x="692" y="64" text-anchor="middle">匹配</text><text x="692" y="82" text-anchor="middle" class="small">只出条目</text>
+<rect class="box warn2" x="752" y="40" width="92" height="56" rx="8"/><text x="798" y="64" text-anchor="middle">复核</text><text x="798" y="82" text-anchor="middle" class="small">人决定</text>
+<rect class="box good" x="858" y="40" width="92" height="56" rx="8"/><text x="904" y="64" text-anchor="middle">查询导出</text><text x="904" y="82" text-anchor="middle" class="small">三份 xlsx</text>
+<path class="arrow" d="M102,68 L116,68"/><path class="arrow" d="M208,68 L222,68"/><path class="arrow" d="M314,68 L328,68"/><path class="arrow" d="M420,68 L434,68"/><path class="arrow" d="M526,68 L540,68"/><path class="arrow" d="M632,68 L646,68"/><path class="arrow" d="M738,68 L752,68"/><path class="arrow" d="M844,68 L858,68"/>
+<text x="268" y="130" text-anchor="middle" class="small">模板 → 同义词 → 大模型建议</text>
+<text x="480" y="130" text-anchor="middle" class="small">逐行结果与差异，确认才写</text>
+<text x="798" y="130" text-anchor="middle" class="small">同一 / 不同 / 独立 / 待补充</text>
+<text x="480" y="170" text-anchor="middle" class="small">黄色三步必须有人操作；其余自动完成，失败时原件照样留存并显示原因</text>
+</svg>
+<figcaption>图 2 · 从一份资料到可导出的档案。入库、匹配在同一个数据库事务里，任一步出错整体回滚。</figcaption>
+</figure>
+
+<h2 id="g4">4. 疑似同一的依据</h2>
+<p><b>先召回、再判定、最后交人。</b>召回只有三条路：共享 OE / 互换号（至少 5 位）；同品类 + 同适配车型；完全没有适配的记录用同品类 + 同位置 + 同尺寸。判定按顺序看：品类 → 位置 → 两边 OE 都有但无一相同 → 缺失 → 适配、年份、尺寸 → 共享编号 → 是否同一供应商。</p>
+<div class="tbl"><table>
+<tr><th>类别</th><th>典型情形</th><th>建议动作（写在条目上）</th></tr>
+<tr><td>强证据疑似同一</td><td>共享 OE，品类、位置、适配、尺寸都一致</td><td>核对后确认同一；可勾选批量确认，每条单独记日志</td></tr>
+<tr><td>无编号佐证</td><td>品类、适配、尺寸一致，但没有共享编号</td><td>对照图片或目录再定</td></tr>
+<tr><td>同源重复</td><td>同一供应商内两条几乎相同</td><td>向供应商确认是否重复报价</td></tr>
+<tr><td>编号冲突</td><td>共享 OE，但品类不同（如格栅与防虫网）</td><td>多半是互换号引用不严，通常判为不同</td></tr>
+<tr><td>位置冲突</td><td>共享 OE，但左右不同</td><td>左右件通常是两个产品</td></tr>
+<tr><td>信息不足</td><td>一边缺适配或尺寸，无法比较</td><td>补资料后再判</td></tr>
+<tr><td>待补充（单条）</td><td>缺品类、适配、尺寸、价格、币种等关键字段</td><td>标记待补充或确认独立</td></tr>
+<tr><td>关键字段变化（单条）</td><td>新版本改了品类、位置、适配、尺寸或 OE</td><td>保留在原产品，或移出成新产品</td></tr>
+</table></div>
+<p class="warn"><b>硬约束</b>：短编号相近、尺寸相同、名称相似、共享 OE——<b>任何单一信号都不会导致合并</b>。所有合并都要人点；合并可撤销；判为"不同"的两条不会被后续合并绕过。不成对的相似记录（同尺寸不同品类、左右不同、OE 均不相同）在记录页给出一句说明。</p>
+
+<h2 id="g5">5. 出处如何留存</h2>
+<ul>
+<li><b>原件</b>：按上传字节原样存档（文件只读），记 sha256；同一供应商重复上传同一文件会被拦下并指向已有记录。</li>
+<li><b>行</b>：每条来源记录带定位——Excel / CSV 为"工作表!R行号"，PDF 为"P页/T表/R行"——以及整行原文和每个单元格坐标。</li>
+<li><b>字段</b>：每个标准字段存 <code>{值, 规则, 警告, 出处[列名, 单元格, 原文]}</code>。例如尺寸"1220 x 750 x 70（表头注明 mm）"存为 122 × 75 × 7 cm，规则写明换算，原文照留。</li>
+<li><b>不猜</b>：币种缺了就是缺，不默认 USD；单元格格式显示 $ 而币种列写 EUR 时以币种列为准并警告；无单位的尺寸不换算。</li>
+<li><b>版本</b>：更新写成新版本并指向上一版，旧版本一行不改；记录页能看到整条版本链。</li>
+<li><b>决定</b>：每次归一、拆分、判不同、选定取值都写决策日志（人、时间、依据）。</li>
+<li><b>导出</b>：三份 xlsx 的每一行都带文件名与定位，能追回原件的那一行。</li>
+</ul>
+
+<h2 id="g6">6. 哪些自动、哪些人工</h2>
+<div class="tbl narrow"><table>
+<tr><th>系统自动做</th><th>必须由人做</th></tr>
+<tr><td>原件存档与去重；解析与定位；列映射建议；字段标准化、单位换算与警告；出处记录；版本对比；候选召回、分类、证据整理与建议动作；查询；三份导出</td><td>确认列映射；确认入库；<b>所有归一、拆分、判为不同的决定</b>；成员取值冲突时选定取值；关键字段变化后保留或移出；补充缺失信息；规则调整</td></tr>
+</table></div>
+<p>大模型只在一处出现：同义词表认不出的列名，给出映射建议（只发送表头和 3 行样例），仍需人确认。匹配与归一不调用大模型。</p>
+
+<h2 id="g7">7. 如何持续维护</h2>
+<ul>
+<li><b>增量导入</b>：同一供应商的新文件逐行与其当前版本对比，分为新增、未变（不重复写入）、报价更新、资料更新、关键字段变化，外加"本次未出现"（只提示不删除）。报价、资料更新时归一关系延续；关键字段变化时暂停该成员并生成复核条目。</li>
+<li><b>新供应商 / 新格式</b>：首次确认的列映射存为该供应商模板，下次同表头文件自动沿用。</li>
+<li><b>规则调整</b>：品类词表在 <code>apps/sources/rules/vocabulary.json</code>，匹配参数与建议动作在 <code>apps/archive/rules/matching.json</code>。改完先预演 <code>archive_rematch --restandardize</code>，确认后加 <code>--commit</code>：从原件重新推导字段，结果变化的写成"规则重算"新版本；已决条目证据不变就保持，证据变了自动重开。</li>
+<li><b>人工确认回写</b>：复核台上的决定即时生效并入日志；再导入、再匹配都会沿用，不会被机器推翻。</li>
+</ul>
+
+<h2 id="g8">8. 页面与命令入口</h2>
+<div class="tbl"><table>
+<tr><th>要做的事</th><th>页面</th><th>命令</th></tr>
+<tr><td>上传资料、确认列映射、预检入库</td><td>资料归档 <code>/sources/</code></td><td><code>archive_import 文件 --supplier 名称 [--map 表头=字段] [--commit]</code></td></tr>
+<tr><td>处理待确认条目</td><td>归一复核 <code>/archive/review/</code></td><td>—（决定只在页面上做，需写依据）</td></tr>
+<tr><td>查编号、关键词、品牌、供应商；看产品与记录</td><td>档案查询 <code>/archive/</code></td><td>—</td></tr>
+<tr><td>导出三份结果</td><td>档案查询页底部</td><td><code>archive_export --out 目录</code></td></tr>
+<tr><td>规则调整后重算</td><td>—</td><td><code>archive_rematch [--restandardize [--commit]]</code></td></tr>
+</table></div>
+<p>现场拿到没见过的资料时的步骤见 <a href="https://github.com/YamahaFG1984/truck-parts-data-center-project/blob/main/docs/DEMO_SCRIPT.md">演示脚本 · 第二阶段</a>。</p>
+
+<h2 id="g9">9. 局限与不做的事</h2>
+<ul>
+<li>不做汇率换算；不做扫描件 OCR；不凭图片判断是否同一件。</li>
+<li>没有表格线也对不齐的 PDF 会标为"无法识别表格"，原件保留、提示人工处理。</li>
+<li>入库后匹配是全量重算（结果幂等、保留条目编号），目前规模足够；数据量大后再改成只算变化的记录。</li>
+<li>品类词表需要持续补充；未登记的品类保留原文并警告。</li>
+</ul>
+</main>
+<footer class="site">归档与归一化 · 交付说明 v1.0 · 演示数据均为合成，编号不代表真实 OE 号。</footer>
+</body>
+</html>
