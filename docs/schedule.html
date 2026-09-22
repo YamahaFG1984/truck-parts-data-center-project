@@ -707,7 +707,7 @@ git commit -m "feat(archive): human review queue and write-back (M26)" &amp;&amp
 <h4>文件</h4>
 <ul>
 <li><code>apps/sources/services/ingest.py</code>：预检中与该供应商当前版本对比；入库时建版本链</li>
-<li><code>apps/archive/services/matching.py</code>：报价更新时成员关系延续；关键字段变化时暂停成员并生成 key_change 条目；只对新增和变化的记录重新匹配</li>
+<li><code>apps/archive/services/review.py</code>：报价更新时成员关系延续；关键字段变化时暂停成员并生成 key_change 条目，人工"保留 / 移出"（按第二阶段约定，归一关系只经 review.py 写入）；<code>matching.py</code> 只管理配对与待补充条目，入库后全量重算</li>
 <li>预检页显示旧值 → 新值</li>
 <li>测试：同一文件二次导入（被哈希拦下）；改价格的新文件 → 报价更新且归一保持；改位置 → 暂停 + 条目；删掉一行 → 本次未出现；record_key 回退到内容哈希时的警告</li>
 </ul>

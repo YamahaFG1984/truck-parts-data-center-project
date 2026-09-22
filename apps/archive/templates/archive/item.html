@@ -16,8 +16,14 @@
 <table class="w-full text-sm">
   <thead class="bg-slate-50 text-left text-slate-500"><tr>
     <th class="py-2 px-3 w-28">字段</th>
+    {% if item.kind == "key_change" %}
+    <th class="py-2 px-3">新版本 v{{ item.record_a.version }} · {{ item.record_a.supplier.name }} · {{ item.record_a.record_key }}
+      <div class="text-xs font-normal">{{ members.a.product.code }} · {{ members.a.size }} 条成员 · 成员关系{{ members.a.get_status_display }}</div></th>
+    <th class="py-2 px-3">旧版本 v{{ item.record_b.version }}<div class="text-xs font-normal">原样保留，不会被修改</div></th>
+    {% else %}
     {% for side, m in members.items %}<th class="py-2 px-3">{% if side == "a" %}{{ item.record_a.supplier.name }} · {{ item.record_a.record_key }}{% else %}{{ item.record_b.supplier.name }} · {{ item.record_b.record_key }}{% endif %}
       <div class="text-xs font-normal">{{ m.product.code }} · {{ m.product.get_status_display }} · {{ m.size }} 条成员</div></th>{% endfor %}
+    {% endif %}
   </tr></thead>
   <tbody>
   {% for row in rows %}
@@ -46,6 +52,9 @@
     {% if item.kind == "pair" %}
       <button name="action" value="same" class="rounded bg-emerald-700 px-4 py-1.5 text-white hover:bg-emerald-800">确认是同一产品</button>
       <button name="action" value="different" class="rounded bg-slate-700 px-4 py-1.5 text-white hover:bg-slate-800">判为不同产品</button>
+    {% elif item.kind == "key_change" %}
+      <button name="action" value="keep" class="rounded bg-emerald-700 px-4 py-1.5 text-white hover:bg-emerald-800">仍是同一件，保留在 {{ members.a.product.code }}</button>
+      <button name="action" value="split" class="rounded bg-slate-700 px-4 py-1.5 text-white hover:bg-slate-800">已不是同一件，移出成新产品</button>
     {% else %}
       <button name="action" value="needs_info" class="rounded bg-amber-600 px-4 py-1.5 text-white hover:bg-amber-700">标记待补充</button>
       <button name="action" value="independent" class="rounded bg-slate-700 px-4 py-1.5 text-white hover:bg-slate-800">确认独立（信息够用）</button>

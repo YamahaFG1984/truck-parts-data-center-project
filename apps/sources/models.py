@@ -97,6 +97,7 @@ class SourceRecord(models.Model):
     class ChangeType(models.TextChoices):
         NEW = "new", "新增"
         PRICE_UPDATE = "price_update", "报价更新"
+        INFO_UPDATE = "info_update", "资料更新（非关键字段）"
         KEY_CHANGE = "key_change", "关键字段变化"
 
     source_file = models.ForeignKey(SourceFile, verbose_name="资料文件",

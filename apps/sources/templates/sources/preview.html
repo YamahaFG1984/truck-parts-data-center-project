@@ -7,28 +7,35 @@
 <h1 class="text-2xl font-bold mb-1 break-all">{{ source.original_name }}</h1>
 <p class="text-sm text-slate-500 mb-4">下面是每一行将要存成的样子，<b>此时还没有写入任何记录</b>。缺失与警告不阻止入库——它们会跟着记录保存，进入待确认清单。</p>
 
-<section class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
-  <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">行数</div><div class="text-2xl font-bold">{{ counts.rows }}</div></div>
+<section class="grid grid-cols-3 sm:grid-cols-6 gap-3 mb-4 text-sm">
+  <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">新增</div><div class="text-2xl font-bold">{{ counts.new }}</div></div>
+  <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">报价 / 资料更新</div><div class="text-2xl font-bold text-sky-700">{{ counts.price_update|add:counts.info_update }}</div></div>
+  <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">关键字段变化</div><div class="text-2xl font-bold {% if counts.key_change %}text-red-600{% endif %}">{{ counts.key_change }}</div></div>
+  <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">未变</div><div class="text-2xl font-bold text-slate-400">{{ counts.unchanged }}</div></div>
   <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">有警告</div><div class="text-2xl font-bold text-amber-600">{{ counts.with_warnings }}</div></div>
   <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">缺关键字段</div><div class="text-2xl font-bold text-red-600">{{ counts.with_missing }}</div></div>
-  <div class="rounded-lg border border-slate-200 bg-white p-3"><div class="text-slate-500">不能入库</div><div class="text-2xl font-bold {% if counts.blocked %}text-red-700{% endif %}">{{ counts.blocked }}</div></div>
 </section>
+{% if counts.key_change %}<p class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">有 {{ counts.key_change }} 条关键字段变化：入库后，已归一产品里的这些记录会暂停成员关系，并生成复核条目，由人决定是否仍属原产品。</p>{% endif %}
 
 {% if source.status != "committed" %}
 <form method="post" class="mb-4">{% csrf_token %}
-  <button type="submit" class="rounded bg-blue-700 px-5 py-2 text-white hover:bg-blue-800 disabled:bg-slate-300" {% if counts.blocked %}disabled{% endif %}>确认入库 {{ counts.rows }} 条</button>
+  <button type="submit" class="rounded bg-blue-700 px-5 py-2 text-white hover:bg-blue-800 disabled:bg-slate-300" {% if counts.blocked %}disabled{% endif %}>确认入库 {{ writes }} 条{% if counts.unchanged %}（另有 {{ counts.unchanged }} 条与上一版相同，不重复写入）{% endif %}</button>
 </form>
 {% endif %}
 
 <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
 <table class="w-full text-sm">
   <thead class="bg-slate-50 text-left text-slate-500"><tr>
-    <th class="py-2 px-3">定位</th><th class="py-2 px-3">身份</th><th class="py-2 px-3">品类 / 位置</th><th class="py-2 px-3">适配</th><th class="py-2 px-3">尺寸 cm</th><th class="py-2 px-3">报价</th><th class="py-2 px-3">缺失 / 警告</th>
+    <th class="py-2 px-3">定位</th><th class="py-2 px-3">变化</th><th class="py-2 px-3">身份</th><th class="py-2 px-3">品类 / 位置</th><th class="py-2 px-3">适配</th><th class="py-2 px-3">尺寸 cm</th><th class="py-2 px-3">报价</th><th class="py-2 px-3">缺失 / 警告</th>
   </tr></thead>
   <tbody>
   {% for p in planned %}{% with t=p.std.typed %}
     <tr class="border-t border-slate-100 align-top {% if p.problem %}bg-red-50{% endif %}">
       <td class="py-1.5 px-3 whitespace-nowrap text-slate-500 font-mono text-xs">{{ p.locator }}</td>
+      <td class="py-1.5 px-3 text-xs">
+        <span class="inline-block rounded px-1.5 py-0.5 whitespace-nowrap {% if p.change == 'key_change' %}bg-red-100 text-red-800{% elif p.change == 'new' %}bg-emerald-100 text-emerald-800{% elif p.change == 'unchanged' %}bg-slate-100 text-slate-500{% else %}bg-sky-100 text-sky-800{% endif %}">{{ p.change_label }}{% if p.previous %} v{{ p.previous.version }}→{% if p.change != "unchanged" %}v{{ p.previous.version|add:1 }}{% endif %}{% endif %}</span>
+        {% for d in p.diff %}<div class="mt-0.5 {% if d.kind == 'key' %}text-red-700{% else %}text-slate-600{% endif %}">{{ d.label }}：{{ d.old|default:"（空）" }} → {{ d.new|default:"（空）" }}</div>{% endfor %}
+      </td>
       <td class="py-1.5 px-3 whitespace-nowrap">{{ p.record_key|truncatechars:18 }}<div class="text-xs text-slate-400">{{ t.supplier_sku }}</div></td>
       <td class="py-1.5 px-3">{{ t.part_type|default:"—" }}{% if t.position %} · <b>{{ t.position }}</b>{% endif %}<div class="text-xs text-slate-400">{{ t.name }}</div></td>
       <td class="py-1.5 px-3">{{ t.make }} {{ t.model }}{% if t.year_from %} {{ t.year_from }}–{{ t.year_to|default:"" }}{% endif %}</td>
@@ -44,4 +51,12 @@
   </tbody>
 </table>
 </div>
+
+{% if planned.absent %}
+<h2 class="font-semibold mt-6 mb-2">本次未出现（{{ planned.absent|length }}）</h2>
+<p class="text-sm text-slate-500 mb-2">这些记录在该供应商以前的资料里有、这份里没有。只作提示：不会删除，也不改变它们的归一关系。</p>
+<ul class="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100 text-sm">
+  {% for r in planned.absent %}<li class="px-3 py-1.5">{{ r.record_key }} · {{ r.part_type }}{% if r.position %} · {{ r.position }}{% endif %} <span class="text-slate-400">（最近一版来自 {{ r.source_file.original_name }} · {{ r.locator }}）</span></li>{% endfor %}
+</ul>
+{% endif %}
 {% endblock %}

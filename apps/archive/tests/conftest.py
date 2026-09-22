@@ -29,6 +29,6 @@ def find_item(key: str, status: str | None = "open"):
         keys = [item.identity_a.split(":", 1)[1]]
         if item.identity_b:
             keys.append(item.identity_b.split(":", 1)[1])
-        if "~".join(keys) == key:
+        if sorted(keys) == sorted(key.split("~")):  # identities sort as text: 10: < 9:
             return item
     raise LookupError(key)

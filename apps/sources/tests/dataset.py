@@ -19,6 +19,10 @@ the rows are paired so that each trap appears at least once:
                     Y-010 no fitment, Y-011 no MOQ
     currencies      X-002 EUR and X-003 USD cells both formatted "$"; Y-002 GBP
     short codes     X-01-00 and Y01X share "01" and must never be matched on it
+
+A second edition of X's price list (workbook_x2) exercises incremental import:
+X-001 new price, X-002 moved Left → Right (a key field), X-004 new supplier SKU,
+X-010 dropped, X-012 added; every other row is unchanged.
 """
 
 import datetime as dt
@@ -97,20 +101,42 @@ def workbook_y() -> bytes:
     return workbook_bytes(HEADERS_B, ROWS_Y, sheet="Catalog Export")
 
 
-def ingest_both(user):
-    """Archive, map (as suggested) and commit both suppliers' files; returns (x, y)."""
+def _x2_rows():
+    rows = [list(r) for r in ROWS_X if r[0] != "X-010"]
+    edits = {"X-001": {7: 45.0, 10: _d(20)},
+             "X-002": {2: "Side Grille, Right side", 4: "Right"},
+             "X-004": {1: "X-04-01"}}
+    for row in rows:
+        for column, value in edits.get(row[0], {}).items():
+            row[column] = value
+    return rows + [["X-012", "X-12-00", "Bug Screen", CENTURY, None, "OE-TST-2012",
+                    "118 x 70 x 6 cm", 38.5, "USD", 10, _d(20)]]
+
+
+@functools.cache
+def workbook_x2() -> bytes:
+    return workbook_bytes(HEADERS_A, _x2_rows(), sheet="Price List")
+
+
+def ingest(user, supplier, data: bytes, name: str, *, commit=True):
+    """Archive and map (as suggested) one file; commit unless told not to."""
     from django.core.files.uploadedfile import SimpleUploadedFile
 
-    from apps.sources.services import ingest, intake
+    from apps.sources.services import ingest as ingest_service
+    from apps.sources.services import intake
     from apps.sources.services.storage import store_upload
+
+    source = store_upload(SimpleUploadedFile(name, data), supplier, user)
+    intake.suggestions(source, intake.inspect(source))
+    intake.confirm(source, {}, user)
+    if commit:
+        ingest_service.commit(source, user)
+    return source
+
+
+def ingest_both(user):
+    """Archive, map (as suggested) and commit both suppliers' files; returns (x, y)."""
     from apps.suppliers.tests.factories import SupplierFactory
 
-    files = []
-    for name, data in (("Supplier X", workbook_x()), ("Supplier Y", workbook_y())):
-        source = store_upload(SimpleUploadedFile(f"{name}.xlsx", data),
-                              SupplierFactory(name=name), user)
-        intake.suggestions(source, intake.inspect(source))
-        intake.confirm(source, {}, user)
-        ingest.commit(source, user)
-        files.append(source)
-    return files
+    return [ingest(user, SupplierFactory(name=name), data, f"{name}.xlsx")
+            for name, data in (("Supplier X", workbook_x()), ("Supplier Y", workbook_y()))]

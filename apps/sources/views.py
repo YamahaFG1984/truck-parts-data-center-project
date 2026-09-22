@@ -111,9 +111,10 @@ class PreviewView(View):
         except (ingest.IngestError, ReadError) as exc:
             messages.error(request, str(exc))
             return redirect("sources:detail", pk=pk)
+        counts = self.source.stats["preview"]
         return render(request, self.template_name, {
-            "source": self.source, "planned": planned,
-            "counts": self.source.stats["preview"],
+            "source": self.source, "planned": planned, "counts": counts,
+            "writes": counts["rows"] - counts["unchanged"],
         })
 
     def post(self, request, pk):
@@ -123,5 +124,7 @@ class PreviewView(View):
             messages.error(request, str(exc))
             return redirect("sources:preview" if self.source.mapping.get("confirmed")
                             else "sources:detail", pk=pk)
-        messages.success(request, f"已入库 {count} 条来源记录。")
+        unchanged = self.source.stats["committed"]["unchanged"]
+        note = f"；{unchanged} 条与上一版相同，未重复写入。" if unchanged else "。"
+        messages.success(request, f"已入库 {count} 条来源记录{note}")
         return redirect("sources:detail", pk=pk)

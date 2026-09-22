@@ -14,6 +14,8 @@ from apps.sources.models import SourceRecord
 from ..models import DecisionLog, FieldChoice, Membership, Product, ReviewItem
 
 S = ReviewItem.Status
+# Version-diff fields shown on the side-by-side row that holds them.
+FIELD_ROW = {"make": "fitment", "model": "fitment", "years": "fitment"}
 
 
 class ReviewError(ValueError):
@@ -38,6 +40,30 @@ def enroll(records, *, source_file=None, user=None) -> int:
              source_file=getattr(source_file, "pk", None),
              records=[r.pk for r in new], products=[p.pk for p in products])
     return len(new)
+
+
+def advance(records, *, user=None) -> list[Membership]:
+    """New versions of known records: the membership follows the latest version. A key
+    field change in a product with other members suspends the membership and opens a
+    key-change item; a person decides whether it still belongs there."""
+    from apps.sources.services import versions
+
+    suspended = []
+    for record in records:
+        membership = membership_of(record)
+        membership.current_record = record
+        if (record.change_type == SourceRecord.ChangeType.KEY_CHANGE
+                and membership.product.memberships.count() > 1):
+            membership.status = Membership.Status.SUSPENDED
+            _, changes = versions.diff(versions.snapshot_record(record.previous),
+                                       versions.snapshot_record(record))
+            _open_key_change(record, [c for c in changes if c["kind"] == "key"])
+            suspended.append(membership)
+        membership.save(update_fields=["current_record", "status", "updated_at"])
+    if records:
+        _log("advance", user, records=[r.pk for r in records],
+             suspended=[m.record_key for m in suspended])
+    return suspended
 
 
 def membership_of(record: SourceRecord) -> Membership:
@@ -126,6 +152,33 @@ def bulk_confirm(items, user, note: str = "") -> tuple[list, list]:
     return done, refused
 
 
+@transaction.atomic
+def keep_after_key_change(item: ReviewItem, user, note: str = "") -> Product:
+    """The changed record is still the same part: resume its membership."""
+    _check(item, ReviewItem.Kind.KEY_CHANGE)
+    membership = membership_of(item.record_a)
+    membership.status = Membership.Status.ACTIVE
+    membership.save(update_fields=["status", "updated_at"])
+    _decide(item, S.SAME, user, note)
+    _log("keep_after_key_change", user, item, product=membership.product.code, note=note)
+    _close_implied(membership.product, user, item)
+    return membership.product
+
+
+@transaction.atomic
+def split_after_key_change(item: ReviewItem, user, note: str = "") -> Product:
+    """The changed record is no longer the same part: it leaves as a new product."""
+    _check(item, ReviewItem.Kind.KEY_CHANGE)
+    membership = membership_of(item.record_a)
+    membership.status = Membership.Status.ACTIVE
+    membership.save(update_fields=["status", "updated_at"])
+    _decide(item, S.DIFFERENT, user, note)
+    if membership.product.memberships.count() < 2:  # already alone: nothing to split
+        _log("split_after_key_change", user, item, product=membership.product.code, note=note)
+        return membership.product
+    return detach(membership, user, note or "关键字段变化后移出")
+
+
 # --- decisions on products ------------------------------------------------------------
 
 
@@ -208,6 +261,30 @@ def _close_implied(product: Product, user, source: ReviewItem) -> None:
         _decide(item, S.SAME, user, f"由条目 #{source.pk} 的决定推出：两条记录已在 {product.code}")
     if implied:
         _log("implied_same", user, source, product=product.code, items=[i.pk for i in implied])
+
+
+def _open_key_change(record: SourceRecord, changes: list[dict]) -> ReviewItem:
+    """One open key-change item per record identity, always about the latest version."""
+    import hashlib
+
+    from .matching import rules
+
+    identity = f"{record.supplier_id}:{record.record_key}"
+    ReviewItem.objects.filter(kind=ReviewItem.Kind.KEY_CHANGE, identity_a=identity,
+                              status=S.OPEN).update(status=S.SUPERSEDED)
+    previous = record.previous
+    return ReviewItem.objects.create(
+        kind=ReviewItem.Kind.KEY_CHANGE, category=ReviewItem.Category.KEY_CHANGE,
+        strength="conflict", record_a=record, record_b=previous, identity_a=identity,
+        triggers=[f"v{previous.version} → v{record.version} 关键字段变化：" + "；".join(
+            f"{c['label']} {c['old'] or '（空）'} → {c['new'] or '（空）'}" for c in changes)],
+        conflicts=[{"field": FIELD_ROW.get(c["field"], c["field"]), "label": c["label"],
+                    "a": {"value": c["new"], "record": record.pk},
+                    "b": {"value": c["old"], "record": previous.pk}} for c in changes],
+        suggested_action=rules()["actions"]["key_change"],
+        evidence_hash=hashlib.sha256(f"{identity}:{record.pk}".encode()).hexdigest(),
+        rules_version=rules()["version"],
+    )
 
 
 def _log(action: str, user, item: ReviewItem | None = None, **payload) -> DecisionLog:

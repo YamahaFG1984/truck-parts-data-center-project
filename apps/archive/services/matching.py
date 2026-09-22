@@ -23,6 +23,7 @@ from apps.sources.services.standardize import LABELS, vocabulary
 from ..models import ReviewItem
 
 RULES = Path(__file__).resolve().parent.parent / "rules" / "matching.json"
+MANAGED_KINDS = [ReviewItem.Kind.PAIR, ReviewItem.Kind.INCOMPLETE]
 C = ReviewItem.Category
 STRENGTH = {C.STRONG: "strong", C.NO_NUMBER: "medium", C.SAME_SOURCE: "medium",
             C.NUMBER_CONFLICT: "conflict", C.POSITION_CONFLICT: "conflict",
@@ -141,10 +142,11 @@ def rematch() -> dict:
                .prefetch_related("numbers"))
     candidates = find_candidates(records)
     counts = defaultdict(int)
+    managed = ReviewItem.objects.filter(kind__in=MANAGED_KINDS)  # key changes are review's
     with transaction.atomic():
-        open_items = {_key(i): i for i in ReviewItem.objects.filter(status="open")}
+        open_items = {_key(i): i for i in managed.filter(status="open")}
         decided = {}
-        for item in (ReviewItem.objects.exclude(status__in=["open", "superseded"])
+        for item in (managed.exclude(status__in=["open", "superseded"])
                      .order_by("decided_at", "id")):
             decided[_key(item)] = item
         seen = set()

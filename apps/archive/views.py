@@ -15,6 +15,8 @@ ACTIONS = {
     "different": (review.mark_different, "已判为不同产品。"),
     "independent": (review.confirm_independent, "已确认为独立产品：{code}"),
     "needs_info": (review.mark_needs_info, "已标记待补充：{code}"),
+    "keep": (review.keep_after_key_change, "已保留在 {code}，成员关系恢复。"),
+    "split": (review.split_after_key_change, "已处理：该记录现属 {code}。"),
 }
 
 
@@ -41,14 +43,16 @@ class QueueView(TemplateView):
 
 
 class ItemView(View):
-    """Two records side by side; POST action=same|different|independent|needs_info."""
+    """Two records side by side (for a key change: new and previous version);
+    POST action=same|different|independent|needs_info|keep|split."""
 
     def get(self, request, pk):
         item = get_object_or_404(ReviewItem.objects.select_related(
             "record_a__supplier", "record_b__supplier", "record_a__source_file",
             "record_b__source_file", "decided_by"), pk=pk)
-        members = {side: review.membership_of(record)
-                   for side, record in (("a", item.record_a), ("b", item.record_b)) if record}
+        sides = (("a", item.record_a),) if item.kind == ReviewItem.Kind.KEY_CHANGE else (
+            ("a", item.record_a), ("b", item.record_b))
+        members = {side: review.membership_of(record) for side, record in sides if record}
         for membership in members.values():
             membership.size = membership.product.memberships.count()
         return render(request, "archive/item.html", {

@@ -15,8 +15,8 @@ def open_items():
     def short(identity):
         return identity.split(":", 1)[1]
 
-    return {"~".join(filter(None, [short(i.identity_a), short(i.identity_b or ":")]))
-            .rstrip("~"): i for i in ReviewItem.objects.filter(status="open")}
+    return {"~".join(sorted(filter(None, [short(i.identity_a), short(i.identity_b or ":")]))): i
+            for i in ReviewItem.objects.filter(status="open")}
 
 
 EXPECTED = {

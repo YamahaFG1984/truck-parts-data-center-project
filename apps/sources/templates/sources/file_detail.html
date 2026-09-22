@@ -33,8 +33,10 @@
       </ul>
       <p class="mt-3">
         {% if source.status == "committed" %}
-          <span class="text-emerald-700">✓ 已入库 {{ source.stats.committed.rows }} 条来源记录</span>
-          <span class="text-slate-500 ml-2">其中 {{ source.stats.committed.with_warnings }} 条有警告、{{ source.stats.committed.with_missing }} 条缺关键字段</span>
+          {% with c=source.stats.committed %}
+          <span class="text-emerald-700">✓ 已入库：新增 {{ c.new }}、报价更新 {{ c.price_update|default:0 }}、资料更新 {{ c.info_update|default:0 }}、关键字段变化 {{ c.key_change|default:0 }}、未变 {{ c.unchanged|default:0 }}</span>
+          <span class="text-slate-500 ml-2">{{ c.with_warnings }} 条有警告、{{ c.with_missing }} 条缺关键字段{% if c.absent %}、{{ c.absent }} 条本次未出现{% endif %}</span>
+          {% endwith %}
         {% elif source.mapping.confirmed %}
           <span class="text-emerald-700">✓ 列映射已确认</span>
           <a href="{% url 'sources:mapping' source.pk %}" class="ml-2 text-blue-700 hover:underline">查看或修改</a>

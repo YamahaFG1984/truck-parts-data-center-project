@@ -144,18 +144,6 @@ def test_a_failure_half_way_leaves_nothing_behind(user, monkeypatch):
     assert not SourceRecord.objects.exists() and source.status != "committed"
 
 
-def test_known_identities_wait_for_incremental_import(user):
-    supplier = SupplierFactory()
-    ingest.commit(mapped(workbook_x(), user, supplier), user)
-    again = mapped(workbook_bytes(HEADERS_A, ROWS), user, supplier, name="september.xlsx")
-
-    planned = ingest.preview(again)
-
-    assert planned[0].problem and "M27" in planned[0].problem
-    with pytest.raises(IngestError, match="不能入库"):
-        ingest.commit(again, user)
-
-
 def test_pdf_rows_are_located_by_page_table_and_row(user):
     header = ["Source Ref", "Brand Number", "English Name", "Offer Price", "Curr."]
     data = make_pdf([[header, ["Y-101", "Y1X", "Front Grille", "46.58", "USD"]],
